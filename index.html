@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The AI Trucker — Built by a Trucker, Powered by AI</title>
+  <meta name="description" content="AI-powered tools for independent truckers and owner-operators. Know if a load is worth it before you roll.">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800&family=Barlow:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:  #0a0a0a;
+      --dp:     #111111;
+      --yellow: #FFD600;
+      --chrome: #C0C8D0;
+      --white:  #F0F6FF;
+      --light:  #888888;
+      --border: #222222;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { font-family:'Barlow',sans-serif; background:var(--black); color:var(--white); overflow-x:hidden; }
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        repeating-linear-gradient(45deg,  transparent, transparent 4px, rgba(255,255,255,.015) 4px, rgba(255,255,255,.015) 5px),
+        repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255,255,255,.015) 4px, rgba(255,255,255,.015) 5px);
+      background-size: 10px 10px;
+    }
+    .chrome-divider { height:3px; background:linear-gradient(90deg, transparent, var(--chrome), transparent); position:relative; z-index:1; }
+    section { position:relative; z-index:1; }
+    .section-inner { max-width:1000px; margin:0 auto; padding:80px 24px; }
+    .section-eyebrow { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.15em; color:var(--yellow); margin-bottom:12px; }
+    .section-title { font-family:'Barlow Condensed',sans-serif; font-size:clamp(36px,6vw,56px); font-weight:900; letter-spacing:-1px; margin-bottom:48px; }
+
+    /* NAV */
+    nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:14px 40px; display:flex; align-items:center; justify-content:space-between; background:rgba(10,10,10,.92); backdrop-filter:blur(10px); border-bottom:3px solid var(--yellow); }
+    .nav-logo { font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:900; letter-spacing:-.5px; }
+    .nav-logo .w { color:var(--white); }
+    .nav-logo .y { color:var(--yellow); }
+    .nav-links { display:flex; align-items:center; gap:32px; }
+    .nav-links a { font-size:13px; font-weight:600; color:var(--light); text-decoration:none; letter-spacing:.04em; transition:color .15s; }
+    .nav-links a:hover { color:var(--white); }
+    .nav-cta { background:var(--yellow); color:var(--black); font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:900; padding:9px 22px; border-radius:4px; text-decoration:none; letter-spacing:.5px; transition:all .15s; }
+    .nav-cta:hover { background:var(--white); }
+
+    /* HERO */
+    .hero { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:120px 24px 80px; position:relative; }
+    .hero-glow { position:absolute; top:25%; left:50%; transform:translateX(-50%); width:500px; height:300px; background:radial-gradient(ellipse, rgba(255,214,0,.06) 0%, transparent 70%); pointer-events:none; }
+    .hero-eyebrow { display:inline-flex; align-items:center; gap:8px; background:rgba(255,214,0,.08); border:1px solid rgba(255,214,0,.25); border-radius:4px; padding:6px 16px; font-size:11px; font-weight:700; color:var(--yellow); text-transform:uppercase; letter-spacing:.12em; margin-bottom:28px; animation:fadeUp .6s ease both; }
+    .hero h1 { font-family:'Barlow Condensed',sans-serif; font-size:clamp(60px,11vw,104px); font-weight:900; line-height:.9; letter-spacing:-2px; margin-bottom:24px; animation:fadeUp .6s .1s ease both; }
+    .hero h1 .w { color:var(--white); }
+    .hero h1 .y { color:var(--yellow); display:block; }
+    .hero h1 .sub { font-size:clamp(22px,4vw,40px); font-weight:600; color:var(--light); display:block; margin-top:10px; letter-spacing:-1px; }
+    .hero-desc { font-size:17px; color:var(--light); max-width:520px; line-height:1.65; margin-bottom:40px; animation:fadeUp .6s .2s ease both; }
+    .hero-actions { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-bottom:56px; animation:fadeUp .6s .3s ease both; }
+    .btn-primary { background:var(--yellow); color:var(--black); font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:900; padding:15px 36px; border-radius:4px; text-decoration:none; letter-spacing:.5px; transition:all .2s; border:none; cursor:pointer; }
+    .btn-primary:hover { background:var(--white); transform:translateY(-2px); }
+    .btn-secondary { background:transparent; color:var(--white); border:2px solid var(--border); font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; padding:15px 36px; border-radius:4px; text-decoration:none; letter-spacing:.5px; transition:all .2s; }
+    .btn-secondary:hover { border-color:var(--chrome); color:var(--chrome); }
+    .hero-trust { display:flex; gap:28px; flex-wrap:wrap; justify-content:center; animation:fadeUp .6s .4s ease both; }
+    .trust-item { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--light); font-weight:500; }
+    .trust-dot { width:5px; height:5px; border-radius:50%; background:var(--yellow); }
+
+    /* DEMO */
+    .demo-card { background:var(--dp); border:1px solid var(--border); border-top:4px solid var(--yellow); border-radius:0 0 8px 8px; padding:28px; box-shadow:0 24px 64px rgba(0,0,0,.6); }
+    .demo-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
+    .demo-field { background:rgba(0,0,0,.4); border:1px solid var(--border); border-radius:4px; padding:12px 14px; }
+    .demo-field .df-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--light); margin-bottom:5px; }
+    .demo-field .df-val { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:700; color:var(--white); }
+    .demo-field .df-sub { font-size:11px; color:#444; margin-top:2px; }
+    .demo-verdict { background:rgba(255,214,0,.06); border:2px solid var(--yellow); border-radius:6px; padding:22px; text-align:center; }
+    .dv-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--yellow); margin-bottom:6px; }
+    .dv-rpm { font-family:'Barlow Condensed',sans-serif; font-size:60px; font-weight:900; color:var(--yellow); line-height:1; margin-bottom:4px; }
+    .dv-sub { font-size:13px; color:var(--light); }
+
+    /* FEATURES */
+    .features-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+    .feat-card { background:var(--dp); border:1px solid var(--border); border-left:3px solid var(--yellow); padding:24px; transition:all .2s; }
+    .feat-card:hover { border-left-color:var(--chrome); transform:translateX(4px); }
+    .feat-icon { font-size:28px; margin-bottom:12px; }
+    .feat-title { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:800; margin-bottom:6px; color:var(--white); }
+    .feat-desc { font-size:13px; color:var(--light); line-height:1.65; }
+
+    /* PRICING */
+    .pricing { background:var(--dp); }
+    .pricing-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:640px; margin:0 auto; }
+    .price-card { background:var(--black); border:1.5px solid var(--border); padding:32px; text-align:center; position:relative; transition:all .2s; }
+    .price-card.featured { border-color:var(--yellow); border-top:4px solid var(--yellow); }
+    .price-card .pc-badge { position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--yellow); color:var(--black); font-size:10px; font-weight:900; padding:3px 14px; white-space:nowrap; letter-spacing:.08em; }
+    .price-card .pc-name { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--light); margin-bottom:14px; }
+    .price-card .pc-price { font-family:'Barlow Condensed',sans-serif; font-size:54px; font-weight:900; line-height:1; color:var(--white); }
+    .price-card.featured .pc-price { color:var(--yellow); }
+    .price-card .pc-per { font-size:12px; color:var(--light); margin-top:4px; margin-bottom:20px; }
+    .price-card ul { list-style:none; text-align:left; margin-bottom:24px; }
+    .price-card ul li { font-size:13px; color:var(--light); padding:6px 0; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+    .price-card ul li::before { content:'✓'; color:var(--yellow); font-weight:700; font-size:11px; flex-shrink:0; }
+    .pc-btn { display:block; width:100%; padding:14px; font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:900; text-decoration:none; text-align:center; letter-spacing:.5px; transition:all .15s; cursor:pointer; border:none; }
+    .pc-btn.outline { border:1.5px solid var(--border); color:var(--white); background:transparent; }
+    .pc-btn.outline:hover { border-color:var(--chrome); color:var(--chrome); }
+    .pc-btn.solid { background:var(--yellow); color:var(--black); }
+    .pc-btn.solid:hover { background:var(--white); }
+    .price-free { text-align:center; margin-top:20px; font-size:14px; color:var(--light); }
+    .price-free strong { color:var(--yellow); }
+
+    /* CONSULTING */
+    .consulting-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+    .consult-card { background:var(--dp); border:1px solid var(--border); border-top:3px solid var(--chrome); padding:24px; }
+    .consult-icon { font-size:28px; margin-bottom:12px; }
+    .consult-title { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:800; color:var(--white); margin-bottom:8px; }
+    .consult-desc { font-size:13px; color:var(--light); line-height:1.65; }
+    .consult-cta { margin-top:36px; text-align:center; }
+    .consult-pill { display:inline-block; background:rgba(192,200,208,.06); border:1px solid var(--chrome); padding:6px 18px; font-size:11px; font-weight:700; color:var(--chrome); text-transform:uppercase; letter-spacing:.1em; margin-bottom:16px; }
+
+    /* STORY */
+    .story-card { background:var(--dp); border:1px solid var(--border); border-left:4px solid var(--yellow); padding:40px 48px; }
+    .story-quote { font-family:'Barlow Condensed',sans-serif; font-size:clamp(22px,3.5vw,30px); font-weight:700; line-height:1.35; color:var(--white); margin-bottom:20px; font-style:italic; }
+    .story-quote span { color:var(--yellow); }
+    .story-body { font-size:15px; color:var(--light); line-height:1.75; margin-bottom:20px; }
+    .story-sig { display:flex; align-items:center; gap:14px; }
+    .story-avatar { width:46px; height:46px; border-radius:50%; background:var(--border); border:2px solid var(--yellow); display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:900; color:var(--white); flex-shrink:0; }
+    .story-name { font-weight:700; font-size:15px; color:var(--white); }
+    .story-title-sub { font-size:12px; color:var(--chrome); }
+
+    /* FOOTER */
+    footer { background:var(--dp); border-top:3px solid var(--yellow); padding:40px 40px 28px; position:relative; z-index:1; }
+    .footer-top { display:grid; grid-template-columns:2fr 1fr 1fr; gap:40px; margin-bottom:32px; }
+    .footer-logo { font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:900; margin-bottom:10px; }
+    .footer-logo .w { color:var(--white); }
+    .footer-logo .y { color:var(--yellow); }
+    .footer-tagline { font-size:13px; color:var(--light); line-height:1.65; max-width:260px; margin-bottom:14px; }
+    .footer-powered { font-size:11px; color:#444; }
+    .footer-powered a { color:var(--chrome); text-decoration:none; }
+    .footer-col h4 { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--chrome); margin-bottom:14px; }
+    .footer-col a { display:block; font-size:13px; color:var(--light); text-decoration:none; margin-bottom:8px; transition:color .15s; }
+    .footer-col a:hover { color:var(--white); }
+    .footer-bottom { border-top:1px solid var(--border); padding-top:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+    .footer-copy { font-size:11px; color:#444; }
+    .footer-bmh { font-size:11px; color:#444; text-align:right; }
+    .footer-bmh strong { color:var(--light); display:block; font-size:12px; }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    @media (max-width:768px) {
+      nav { padding:12px 20px; } .nav-links { display:none; }
+      .demo-grid { grid-template-columns:1fr 1fr; }
+      .pricing-grid, .consulting-grid { grid-template-columns:1fr; }
+      .footer-top { grid-template-columns:1fr; gap:24px; }
+      .footer-bottom { flex-direction:column; text-align:center; }
+      .story-card { padding:24px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo"><span class="w">THE AI</span><span class="y">TRUCKER</span></div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#consulting">Consulting</a>
+    <a href="#story">Our Story</a>
+  </div>
+  <a href="loadcalc.html" class="nav-cta">TRY FREE →</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-eyebrow">🚛 Built by a hotshot trucker</div>
+  <h1>
+    <span class="w">KNOW IF A LOAD</span>
+    <span class="y">IS WORTH IT.</span>
+    <span class="sub">Before you roll a single mile.</span>
+  </h1>
+  <p class="hero-desc">AI-powered tools for independent truckers and owner-operators. Calculate real profit, factor every expense, and make smarter decisions — in 30 seconds.</p>
+  <div class="hero-actions">
+    <a href="loadcalc.html" class="btn-primary">⚡ TRY LOADCALC FREE</a>
+    <a href="#features" class="btn-secondary">See How It Works</a>
+  </div>
+  <div class="hero-trust">
+    <div class="trust-item"><div class="trust-dot"></div>No signup required</div>
+    <div class="trust-item"><div class="trust-dot"></div>10 free calculations</div>
+    <div class="trust-item"><div class="trust-dot"></div>Voice input on the road</div>
+    <div class="trust-item"><div class="trust-dot"></div>$19.99 lifetime access</div>
+  </div>
+</section>
+
+<div class="chrome-divider"></div>
+
+<section id="features">
+  <div class="section-inner">
+    <div class="section-eyebrow">LoadCalc in Action</div>
+    <h2 class="section-title">See the verdict instantly</h2>
+    <div class="demo-card">
+      <div class="demo-grid">
+        <div class="demo-field"><div class="df-label">📍 Route</div><div class="df-val">Dallas → Nashville</div><div class="df-sub">671 miles</div></div>
+        <div class="demo-field"><div class="df-label">💰 Offered Rate</div><div class="df-val">$1,100</div><div class="df-sub">gross</div></div>
+        <div class="demo-field"><div class="df-label">📦 Load Type</div><div class="df-val">Under Cab</div><div class="df-sub">~15 MPG</div></div>
+      </div>
+      <div class="demo-verdict">
+        <div class="dv-label">✅ Take It — Covers Costs</div>
+        <div class="dv-rpm">$1.64/mi</div>
+        <div class="dv-sub">Net $437 profit · 671 miles · 0 overnights</div>
+      </div>
+    </div>
+    <div style="height:48px"></div>
+    <div class="section-eyebrow">Why Truckers Use It</div>
+    <h2 class="section-title">Everything you need.<br>Nothing you don't.</h2>
+    <div class="features-grid">
+      <div class="feat-card"><div class="feat-icon">🎤</div><div class="feat-title">Voice Input</div><div class="feat-desc">Hands-free on the road. Say "Dallas TX to Nashville TN rate 1100" and LoadCalc fills everything in automatically.</div></div>
+      <div class="feat-card"><div class="feat-icon">⚡</div><div class="feat-title">Instant Break-Even</div><div class="feat-desc">Factors fuel, per diem, lodging, tolls, and wear & tear. Know your true net profit before you accept the load.</div></div>
+      <div class="feat-card"><div class="feat-icon">📦</div><div class="feat-title">Load Profile MPG</div><div class="feat-desc">Under cab, over cab, or heavy — each changes your fuel economy and bottom line. We calculate the difference.</div></div>
+      <div class="feat-card"><div class="feat-icon">🏨</div><div class="feat-title">Overnight Detection</div><div class="feat-desc">Automatically estimates overnight stops and adds lodging costs to the calculation.</div></div>
+      <div class="feat-card"><div class="feat-icon">💾</div><div class="feat-title">Saved Settings</div><div class="feat-desc">Your diesel price, per diem, and preferences are remembered every time you open the app. Set it once.</div></div>
+      <div class="feat-card"><div class="feat-icon">📱</div><div class="feat-title">Works Everywhere</div><div class="feat-desc">No download needed. Open in your phone browser at any truck stop, fuel island, or rest area.</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="chrome-divider"></div>
+
+<section class="pricing" id="pricing">
+  <div class="section-inner">
+    <div class="section-eyebrow" style="text-align:center">Simple Pricing</div>
+    <h2 class="section-title" style="text-align:center">One tool. Two options.<br>No surprises.</h2>
+    <div class="pricing-grid">
+      <div class="price-card">
+        <div class="pc-name">Monthly</div>
+        <div class="pc-price">$2<span style="font-size:26px">.99</span></div>
+        <div class="pc-per">per month · cancel anytime</div>
+        <ul>
+          <li>Unlimited load calculations</li>
+          <li>Voice input</li>
+          <li>Saved settings</li>
+          <li>Cancel anytime</li>
+        </ul>
+        <a href="loadcalc.html" class="pc-btn outline">GET STARTED</a>
+      </div>
+      <div class="price-card featured">
+        <div class="pc-badge">BEST VALUE</div>
+        <div class="pc-name">Lifetime</div>
+        <div class="pc-price">$19<span style="font-size:26px">.99</span></div>
+        <div class="pc-per">one-time · yours forever</div>
+        <ul>
+          <li>Everything in Monthly</li>
+          <li>Pay once, use forever</li>
+          <li>All future updates included</li>
+          <li>Founding member pricing</li>
+        </ul>
+        <button class="pc-btn solid" onclick="stripeLifetime()">GET LIFETIME ACCESS</button>
+      </div>
+    </div>
+    <p class="price-free"><strong>Start free</strong> — 10 load calculations, no signup, no credit card. <a href="loadcalc.html" style="color:var(--chrome);font-weight:700">Try it now →</a></p>
+  </div>
+</section>
+
+<div class="chrome-divider"></div>
+
+<section id="consulting">
+  <div class="section-inner">
+    <div class="section-eyebrow">Beyond LoadCalc</div>
+    <h2 class="section-title">AI Operations Consulting<br><span style="color:var(--chrome);font-size:65%">for small businesses</span></h2>
+    <p style="font-size:15px;color:var(--light);max-width:600px;line-height:1.75;margin-bottom:32px">The same AI-powered systems I built for my trucking operation — custom built for your business. From automating paperwork to dashboards that run themselves.</p>
+    <div class="consulting-grid">
+      <div class="consult-card"><div class="consult-icon">⚙️</div><div class="consult-title">Operations Automation</div><div class="consult-desc">Eliminate manual data entry, automate invoicing, and get real-time dashboards tailored to how your business actually works.</div></div>
+      <div class="consult-card"><div class="consult-icon">📊</div><div class="consult-title">Business Intelligence</div><div class="consult-desc">Custom KPI dashboards, revenue tracking, and expense analysis so you always know exactly where your money is going.</div></div>
+      <div class="consult-card"><div class="consult-icon">🤖</div><div class="consult-title">AI Integration</div><div class="consult-desc">Put AI to work processing documents, answering customer questions, and handling repetitive tasks so you can focus on growth.</div></div>
+      <div class="consult-card"><div class="consult-icon">📱</div><div class="consult-title">Custom Tools</div><div class="consult-desc">Web-based tools built for your workflow — accessible from any device, no IT team required.</div></div>
+    </div>
+    <div class="consult-cta">
+      <div class="consult-pill">Available for select clients</div><br>
+      <a href="mailto:bmhsolutions3711@gmail.com?subject=AI Consulting Inquiry" class="btn-primary">📩 GET IN TOUCH</a>
+    </div>
+  </div>
+</section>
+
+<div class="chrome-divider"></div>
+
+<section id="story">
+  <div class="section-inner">
+    <div class="section-eyebrow">The Origin</div>
+    <h2 class="section-title">Built from the seat<br>of a pickup truck.</h2>
+    <div class="story-card">
+      <div class="story-quote">"I got tired of doing the math in my head at a fuel stop, accepting loads that looked good on paper, and realizing 400 miles later <span>I barely broke even.</span>"</div>
+      <p class="story-body">I'm Bryan — hotshot trucker, owner-operator, and founder of The AI Trucker. I built LoadCalc for myself first. Every feature exists because I needed it on the road: voice input because I can't type while driving, overnight detection because lodging kills margins, load profiles because my MPG changes dramatically based on what I'm hauling.</p>
+      <p class="story-body">The AI Trucker is the beginning of something bigger — an AI-powered operations platform built for independent contractors and small businesses. But it all started with one question: <em style="color:var(--yellow)">is this load worth it?</em></p>
+      <div class="story-sig">
+        <div class="story-avatar">BH</div>
+        <div>
+          <div class="story-name">Bryan Hertzig</div>
+          <div class="story-title-sub">Founder, BMH Solutions LLC · Owner-Operator · MC: 1700226</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-top">
+    <div>
+      <div class="footer-logo"><span class="w">THE AI</span><span class="y">TRUCKER</span></div>
+      <p class="footer-tagline">AI-powered tools for independent truckers and owner-operators. Know before you go.</p>
+      <div class="footer-powered">A product of <a href="#">BMH Solutions LLC</a> · Green, Ohio</div>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="loadcalc.html">LoadCalc</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#features">Features</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="#consulting">Consulting</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms & Conditions</a>
+      <a href="mailto:bmhsolutions3711@gmail.com">Contact</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2026 The AI Trucker · theaitrucker.io · All rights reserved.</div>
+    <div class="footer-bmh"><strong>BMH Solutions LLC</strong>Green, Ohio · DOT: 04349026 · MC: 1700226</div>
+  </div>
+</footer>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+async function stripeLifetime() {
+  const btn = document.querySelector('.pc-btn.solid');
+  const orig = btn.textContent;
+  btn.textContent = 'Loading...';
+  try {
+    const stripe = Stripe('pk_live_51RKmDlFfNaRdD3wVJEd9RKz6eWXJmavUSBXIi8yoKw7YWZWc7FZHyq5ln9lEkIUDcdExLfCxv3v08CxsJHc8OD7500MQNWA7b4');
+    const { error } = await stripe.redirectToCheckout({
+      lineItems: [{ price: 'price_1TDR9YFfNaRdD3wVROMMgVg3', quantity: 1 }],
+      mode: 'payment',
+      successUrl: 'https://theaitrucker.io/loadcalc.html?success=1',
+      cancelUrl: 'https://theaitrucker.io/#pricing',
+    });
+    if (error) { btn.textContent = orig; alert(error.message); }
+  } catch(e) { btn.textContent = orig; alert('Payment unavailable — try again'); }
+}
+</script>
+</body>
+</html>
