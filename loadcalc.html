@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>LoadCalc — The AI Trucker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Barlow+Condensed:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #090909;
+      --surface: #111111;
+      --surface2:#171717;
+      --border:  #1f1f1f;
+      --border2: #2a2a2a;
+      --yellow:  #FFD600;
+      --yellow2: rgba(255,214,0,.08);
+      --green:   #00E676;
+      --green2:  rgba(0,230,118,.08);
+      --red:     #FF4444;
+      --red2:    rgba(255,68,68,.08);
+      --white:   #F5F5F7;
+      --mid:     #86868b;
+      --dim:     #3d3d3f;
+      --r:       10px;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html { scroll-behavior:smooth; }
+    body {
+      font-family:'DM Sans',sans-serif;
+      background:var(--bg);
+      color:var(--white);
+      min-height:100vh;
+      overflow-x:hidden;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* ── NAV ── */
+    .nav {
+      position:sticky; top:0; z-index:100;
+      padding:14px 24px;
+      display:flex; align-items:center; justify-content:space-between;
+      background:rgba(9,9,9,.85);
+      backdrop-filter:blur(20px) saturate(180%);
+      border-bottom:1px solid var(--border);
+    }
+    .nav-logo { font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:800; text-decoration:none; letter-spacing:-.3px; }
+    .nav-logo .w { color:var(--white); }
+    .nav-logo .y { color:var(--yellow); }
+    .nav-link { font-size:13px; color:var(--mid); text-decoration:none; font-weight:500; transition:color .2s; }
+    .nav-link:hover { color:var(--white); }
+
+    /* ── HERO ── */
+    .hero {
+      padding:48px 24px 36px;
+      text-align:center;
+      position:relative;
+      overflow:hidden;
+    }
+    .hero::before {
+      content:'';
+      position:absolute; top:0; left:50%; transform:translateX(-50%);
+      width:600px; height:400px;
+      background:radial-gradient(ellipse at 50% 0%, rgba(255,214,0,.07) 0%, transparent 65%);
+      pointer-events:none;
+    }
+    .hero-eyebrow {
+      display:inline-flex; align-items:center; gap:6px;
+      background:var(--green2); border:1px solid rgba(0,230,118,.2);
+      border-radius:100px; padding:5px 14px;
+      font-size:12px; font-weight:500; color:var(--green);
+      margin-bottom:20px;
+      animation:fadeUp .5s ease both;
+    }
+    .hero-eyebrow a { color:var(--green); font-weight:600; text-decoration:none; border-bottom:1px solid rgba(0,230,118,.3); }
+    .hero h1 {
+      font-family:'Barlow Condensed',sans-serif;
+      font-size:72px; font-weight:800;
+      line-height:.9; letter-spacing:-3px;
+      margin-bottom:14px;
+      animation:fadeUp .5s .08s ease both;
+    }
+    .hero h1 em { color:var(--yellow); font-style:normal; }
+    .hero-sub {
+      font-family:'Barlow Condensed',sans-serif;
+      font-size:38px; font-weight:700; color:var(--mid);
+      letter-spacing:-.5px; line-height:1;
+      margin-bottom:0;
+      animation:fadeUp .5s .16s ease both;
+    }
+
+    /* ── TRIAL BAR ── */
+    .trial-bar { background:rgba(255,107,0,.08); border-bottom:1px solid rgba(255,107,0,.15); padding:9px 24px; display:flex; align-items:center; justify-content:space-between; font-size:12px; display:none; }
+    .trial-bar.show { display:flex; }
+    .trial-left { color:#FF8C00; font-weight:600; }
+    .trial-upgrade { color:var(--yellow); font-weight:600; cursor:pointer; }
+
+    /* ── MAIN FORM ── */
+    .form-wrap {
+      max-width:480px; margin:0 auto;
+      padding:20px 20px 40px;
+    }
+
+    /* ── MODE RADIO ── */
+    .mode-row {
+      display:flex; align-items:center; justify-content:center;
+      gap:24px; margin-bottom:28px;
+    }
+    .mode-opt {
+      display:flex; align-items:center; gap:8px;
+      cursor:pointer; background:transparent; border:none;
+      color:var(--dim); font-family:'DM Sans',sans-serif;
+      font-size:13px; font-weight:500; transition:color .2s;
+      padding:0;
+    }
+    .mode-opt.active { color:var(--white); }
+    .radio-ring {
+      width:18px; height:18px; border-radius:50%;
+      border:1.5px solid var(--dim);
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; transition:border-color .2s;
+    }
+    .mode-opt.active .radio-ring { border-color:var(--yellow); }
+    .radio-dot {
+      width:8px; height:8px; border-radius:50%;
+      background:var(--yellow); opacity:0; transform:scale(0);
+      transition:all .2s cubic-bezier(.34,1.56,.64,1);
+    }
+    .mode-opt.active .radio-dot { opacity:1; transform:scale(1); }
+
+    /* ── SECTION LABEL ── */
+    .label {
+      font-size:11px; font-weight:600; text-transform:uppercase;
+      letter-spacing:.1em; color:var(--dim);
+      margin-bottom:8px; margin-top:22px;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      overflow:hidden;
+    }
+    .card + .card { margin-top:10px; }
+
+    /* ── TRUCK TOGGLE ── */
+    .truck-row {
+      display:grid; grid-template-columns:1fr 1fr;
+      border-bottom:1px solid var(--border);
+    }
+    .truck-btn {
+      padding:13px; text-align:center;
+      background:transparent; border:none; cursor:pointer;
+      font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
+      color:var(--mid); transition:all .15s; position:relative;
+    }
+    .truck-btn:first-child { border-right:1px solid var(--border); }
+    .truck-btn.active { color:var(--white); background:var(--surface2); }
+    .truck-btn.active::after {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:2px;
+      background:var(--yellow);
+    }
+
+    /* ── ROUTE INPUTS ── */
+    .route-grid {
+      display:grid; grid-template-columns:1fr auto 1fr;
+      align-items:center; gap:0;
+    }
+    .inp-wrap { position:relative; }
+    .inp-label {
+      position:absolute; top:11px; left:14px;
+      font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.08em; color:var(--dim); pointer-events:none;
+      transition:all .15s;
+    }
+    .inp {
+      width:100%; background:transparent; border:none;
+      padding:28px 14px 10px; color:var(--white);
+      font-family:'DM Sans',sans-serif; font-size:16px; font-weight:500;
+      outline:none;
+    }
+    .inp::placeholder { color:var(--dim); font-weight:400; }
+    .inp:focus ~ .focus-line,
+    .inp-wrap:focus-within .focus-line { opacity:1; }
+    .focus-line {
+      position:absolute; bottom:0; left:14px; right:14px; height:1px;
+      background:var(--yellow); opacity:0; transition:opacity .2s;
+    }
+    .route-arrow {
+      display:flex; align-items:center; justify-content:center;
+      width:32px; color:var(--dim); font-size:14px;
+      border-left:1px solid var(--border);
+      border-right:1px solid var(--border);
+      align-self:stretch;
+    }
+    .route-divider { height:1px; background:var(--border); }
+    .rate-wrap { border-top:1px solid var(--border); }
+    .inp-prefix {
+      position:absolute; left:14px; top:50%; transform:translateY(-50%);
+      color:var(--mid); font-size:16px; font-weight:400; pointer-events:none;
+      margin-top:9px;
+    }
+    .inp.has-prefix { padding-left:24px; }
+
+    /* ── VOICE BUTTON ── */
+    .voice-section { text-align:center; margin:20px 0 4px; }
+    .voice-circle {
+      width:56px; height:56px; border-radius:50%;
+      background:var(--green); border:none; cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size:24px; margin:0 auto 10px;
+      box-shadow:0 0 0 0 rgba(0,230,118,.3);
+      transition:transform .15s, background .15s;
+      position:relative;
+    }
+    .voice-circle:hover { transform:scale(1.08); }
+    .voice-circle:active { transform:scale(.95); }
+    .voice-circle.listening {
+      background:var(--red);
+      animation:ripple 1.2s ease-out infinite;
+    }
+    .voice-hint { font-size:12px; color:var(--dim); line-height:1.5; }
+    .voice-hint strong { color:var(--mid); font-weight:500; }
+    @keyframes ripple {
+      0%   { box-shadow:0 0 0 0 rgba(255,68,68,.4); }
+      70%  { box-shadow:0 0 0 16px rgba(255,68,68,0); }
+      100% { box-shadow:0 0 0 0 rgba(255,68,68,0); }
+    }
+
+    /* ── LOAD PROFILE ── */
+    .load-grid { display:grid; grid-template-columns:1fr 1fr 1fr; }
+    .load-btn {
+      padding:16px 8px; background:transparent; border:none;
+      cursor:pointer; text-align:center; transition:all .2s;
+      position:relative; border-right:1px solid var(--border);
+    }
+    .load-btn:last-child { border-right:none; }
+    .load-btn.active { background:var(--surface2); }
+    .load-btn.active::after {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:2px;
+      background:var(--yellow);
+    }
+    .load-btn:active { transform:scale(.96); }
+    .lb-icon { font-size:20px; margin-bottom:5px; }
+    .lb-name { font-size:11px; font-weight:600; color:var(--mid); text-transform:uppercase; letter-spacing:.06em; }
+    .lb-mpg  { font-size:12px; color:var(--yellow); font-family:'DM Mono',monospace; margin-top:3px; }
+    .load-btn.active .lb-name { color:var(--white); }
+
+    /* ── SETTINGS ACCORDION ── */
+    .settings-toggle {
+      width:100%; padding:14px 16px;
+      display:flex; align-items:center; justify-content:space-between;
+      background:transparent; border:none; cursor:pointer;
+      font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500;
+      color:var(--mid); transition:color .2s;
+    }
+    .settings-toggle:hover { color:var(--white); }
+    .settings-toggle-right { display:flex; align-items:center; gap:8px; font-size:12px; }
+    .settings-chevron { font-size:10px; transition:transform .3s; }
+    .settings-chevron.open { transform:rotate(180deg); }
+    .settings-body {
+      overflow:hidden; max-height:0;
+      transition:max-height .35s cubic-bezier(.4,0,.2,1);
+    }
+    .settings-body.open { max-height:400px; }
+    .settings-grid {
+      display:grid; grid-template-columns:1fr 1fr;
+      gap:1px; background:var(--border);
+      border-top:1px solid var(--border);
+    }
+    .s-field { background:var(--surface); padding:12px 14px; }
+    .s-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin-bottom:5px; }
+    .s-inp {
+      width:100%; background:transparent; border:none;
+      color:var(--white); font-family:'DM Mono',monospace;
+      font-size:15px; font-weight:400; outline:none;
+    }
+    .s-inp::placeholder { color:var(--dim); }
+
+    /* ── CALC BUTTON ── */
+    .calc-btn {
+      width:100%; margin-top:14px;
+      padding:17px; border:none;
+      background:var(--yellow); border-radius:var(--r);
+      color:#000; font-family:'Barlow Condensed',sans-serif;
+      font-size:16px; font-weight:800; letter-spacing:.5px;
+      cursor:pointer; transition:all .2s;
+      position:relative; overflow:hidden;
+    }
+    .calc-btn::after {
+      content:''; position:absolute; inset:0;
+      background:rgba(255,255,255,0); transition:background .2s;
+    }
+    .calc-btn:hover::after { background:rgba(255,255,255,.08); }
+    .calc-btn:active { transform:scale(.99); }
+
+    /* ── STATUS ── */
+    .status { text-align:center; font-size:13px; color:var(--yellow); min-height:20px; padding:8px 0; font-weight:400; }
+
+    /* ── RESULTS ── */
+    .results { margin-top:10px; }
+    .results > * {
+      opacity:0; transform:translateY(12px);
+      transition:opacity .4s ease, transform .4s ease;
+    }
+    .results.show > *:nth-child(1) { opacity:1; transform:none; transition-delay:.05s; }
+    .results.show > *:nth-child(2) { opacity:1; transform:none; transition-delay:.15s; }
+    .results.show > *:nth-child(3) { opacity:1; transform:none; transition-delay:.25s; }
+    .results.show > *:nth-child(4) { opacity:1; transform:none; transition-delay:.35s; }
+
+    /* ── VERDICT ── */
+    .verdict {
+      border-radius:var(--r); padding:28px 20px 24px;
+      text-align:center; border:1px solid;
+      margin-bottom:10px;
+    }
+    .verdict.go    { background:var(--green2); border-color:rgba(0,230,118,.2); }
+    .verdict.maybe { background:var(--yellow2); border-color:rgba(255,214,0,.2); }
+    .verdict.no    { background:var(--red2);   border-color:rgba(255,68,68,.2); }
+    .verdict-num {
+      font-family:'Barlow Condensed',sans-serif; font-size:72px; font-weight:800;
+      line-height:1; letter-spacing:-2px; margin-bottom:6px;
+    }
+    .verdict.go    .verdict-num { color:var(--green); }
+    .verdict.maybe .verdict-num { color:var(--yellow); }
+    .verdict.no    .verdict-num { color:var(--red); }
+    .verdict-label {
+      font-size:13px; font-weight:600; text-transform:uppercase;
+      letter-spacing:.1em; margin-bottom:6px;
+    }
+    .verdict.go    .verdict-label { color:var(--green); }
+    .verdict.maybe .verdict-label { color:var(--yellow); }
+    .verdict.no    .verdict-label { color:var(--red); }
+    .verdict-sub { font-size:14px; color:var(--mid); font-weight:400; }
+
+    /* ── STATS ── */
+    .stats-grid {
+      display:grid; grid-template-columns:1fr 1fr;
+      gap:1px; background:var(--border);
+      border-radius:var(--r); overflow:hidden;
+      border:1px solid var(--border); margin-bottom:10px;
+    }
+    .stat { background:var(--surface); padding:14px 16px; }
+    .st-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin-bottom:4px; }
+    .st-val { font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:700; color:var(--white); }
+    .st-sub { font-size:11px; color:var(--dim); margin-top:2px; }
+
+    /* ── BREAKDOWN ── */
+    .breakdown {
+      border-radius:var(--r); overflow:hidden;
+      border:1px solid var(--border); margin-bottom:10px;
+    }
+    .bk-head { padding:12px 16px; background:var(--surface2); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); }
+    .bk-row { display:flex; justify-content:space-between; padding:11px 16px; border-top:1px solid var(--border); font-size:14px; background:var(--surface); }
+    .bk-label { color:var(--mid); }
+    .bk-val { font-family:'DM Mono',monospace; font-size:13px; color:var(--white); }
+    .bk-total { background:var(--surface2); }
+    .bk-total .bk-label { color:var(--white); font-weight:600; }
+    .bk-total .bk-val { color:var(--yellow); font-weight:600; }
+
+    /* ── RESET ── */
+    .reset-btn {
+      width:100%; padding:14px; background:transparent;
+      border:1px solid var(--border); border-radius:var(--r);
+      color:var(--mid); font-family:'DM Sans',sans-serif;
+      font-size:14px; font-weight:500; cursor:pointer;
+      margin-bottom:32px; transition:all .2s;
+    }
+    .reset-btn:hover { border-color:var(--border2); color:var(--white); }
+
+    /* ── MULTI-STOP ── */
+    .stop-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r); margin-bottom:8px; overflow:hidden;
+    }
+    .stop-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 14px 0;
+    }
+    .stop-num { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--yellow); }
+    .stop-remove { background:transparent; border:none; color:var(--dim); font-size:16px; cursor:pointer; padding:0; line-height:1; transition:color .15s; }
+    .stop-remove:hover { color:var(--red); }
+    .add-stop-btn {
+      width:100%; padding:13px;
+      background:transparent; border:1px dashed var(--border2);
+      border-radius:var(--r); color:var(--dim);
+      font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
+      cursor:pointer; margin-bottom:14px; transition:all .2s;
+    }
+    .add-stop-btn:hover { border-color:var(--yellow); color:var(--yellow); }
+    .run-summary {
+      border:1px solid var(--border); border-radius:var(--r);
+      overflow:hidden; margin-bottom:14px;
+    }
+    .rs-head { padding:11px 14px; background:var(--surface2); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); }
+    .rs-row { display:flex; justify-content:space-between; padding:10px 14px; border-top:1px solid var(--border); font-size:13px; background:var(--surface); }
+    .rs-label { color:var(--mid); }
+    .rs-val { font-family:'DM Mono',monospace; font-size:12px; color:var(--white); }
+    .rs-total { background:var(--surface2); }
+    .rs-total .rs-label { color:var(--white); font-weight:600; }
+    .rs-total .rs-val { color:var(--yellow); }
+
+    /* ── PAYWALL ── */
+    .paywall-overlay { display:none; position:fixed; inset:0; z-index:999; background:rgba(0,0,0,.7); backdrop-filter:blur(12px); align-items:flex-end; justify-content:center; }
+    .paywall-overlay.show { display:flex; }
+    .paywall-sheet { background:#141414; border-radius:20px 20px 0 0; padding:32px 24px 44px; width:100%; max-width:480px; border-top:1px solid var(--border2); }
+    .paywall-title { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:-.5px; margin-bottom:6px; }
+    .paywall-title span { color:var(--yellow); }
+    .paywall-sub { font-size:14px; color:var(--mid); margin-bottom:24px; line-height:1.5; font-weight:400; }
+    .plan-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
+    .plan-card { background:var(--surface); border:1px solid var(--border2); border-radius:var(--r); padding:18px 14px; cursor:pointer; text-align:center; transition:all .2s; position:relative; }
+    .plan-card.featured { border-color:rgba(255,214,0,.4); background:var(--yellow2); }
+    .plan-badge { position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--yellow); color:#000; font-size:10px; font-weight:800; padding:2px 10px; border-radius:100px; white-space:nowrap; }
+    .plan-name { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--mid); margin-bottom:8px; }
+    .plan-price { font-family:'Barlow Condensed',sans-serif; font-size:34px; font-weight:800; color:var(--white); line-height:1; }
+    .plan-card.featured .plan-price { color:var(--yellow); }
+    .plan-per { font-size:11px; color:var(--dim); margin-top:3px; }
+    .plan-desc { font-size:12px; color:var(--mid); margin-top:8px; }
+    .paywall-cta { width:100%; padding:16px; background:var(--yellow); border:none; border-radius:var(--r); color:#000; font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:800; letter-spacing:.3px; cursor:pointer; margin-bottom:10px; transition:all .2s; }
+    .paywall-cta:hover { background:#ffe033; }
+    .paywall-skip { width:100%; padding:10px; background:transparent; border:none; color:var(--dim); font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif; }
+
+    /* ── FOOTER ── */
+    .footer { border-top:1px solid var(--border); padding:28px 24px; text-align:center; }
+    .footer p { font-size:12px; color:var(--dim); line-height:1.8; }
+    .footer a { color:var(--mid); text-decoration:none; transition:color .15s; }
+    .footer a:hover { color:var(--yellow); }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="index.html"><span class="w">THE AI</span><span class="y">TRUCKER</span></a>
+  <a class="nav-link" href="index.html#pricing">Pricing</a>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow" id="hero-eyebrow">✓ Free to try — no signup &nbsp;·&nbsp; <a href="index.html#pricing">See plans</a></div>
+  <h1>LOAD<em>CALC</em></h1>
+  <p class="hero-sub">Know before you go.</p>
+</div>
+
+<div class="trial-bar" id="trialBar">
+  <span class="trial-left" id="trialText"></span>
+  <span class="trial-upgrade" onclick="showPaywall()">Unlock unlimited →</span>
+</div>
+
+<div class="form-wrap">
+
+  <!-- Mode -->
+  <div class="mode-row">
+    <button class="mode-opt active" id="mode-single" onclick="setMode('single')">
+      <div class="radio-ring"><div class="radio-dot"></div></div>
+      Single Load
+    </button>
+    <button class="mode-opt" id="mode-multi" onclick="setMode('multi')">
+      <div class="radio-ring"><div class="radio-dot"></div></div>
+      Multi-Stop
+    </button>
+  </div>
+
+  <!-- Truck type -->
+  <div class="card">
+    <div class="truck-row">
+      <button class="truck-btn active" id="btn-hotshot" onclick="selectTruck('hotshot')">🛻 &nbsp;Hotshot</button>
+      <button class="truck-btn" id="btn-semi" onclick="selectTruck('semi')">🚛 &nbsp;Semi</button>
+    </div>
+
+    <!-- Single mode -->
+    <div id="single-mode">
+      <div class="route-grid">
+        <div class="inp-wrap">
+          <span class="inp-label">From</span>
+          <input class="inp" id="origin" placeholder="Dallas, TX" autocomplete="off">
+          <div class="focus-line"></div>
+        </div>
+        <div class="route-arrow">→</div>
+        <div class="inp-wrap">
+          <span class="inp-label">To</span>
+          <input class="inp" id="dest" placeholder="Nashville, TN" autocomplete="off">
+          <div class="focus-line"></div>
+        </div>
+      </div>
+      <div class="route-divider"></div>
+      <div class="rate-wrap inp-wrap" style="position:relative">
+        <span class="inp-label">Offered Rate</span>
+        <span class="inp-prefix">$</span>
+        <input class="inp has-prefix" id="rate" type="number" placeholder="850" inputmode="decimal">
+        <div class="focus-line"></div>
+      </div>
+    </div>
+
+    <!-- Multi-stop mode -->
+    <div id="multi-mode" style="display:none;padding:12px">
+      <div id="stops-container"></div>
+      <button class="add-stop-btn" onclick="addStop()">+ Add Stop</button>
+      <div class="run-summary" id="run-summary" style="display:none">
+        <div class="rs-head">Run Summary</div>
+        <div id="run-summary-rows"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Voice -->
+  <div class="voice-section">
+    <button class="voice-circle" id="voiceBtn" onclick="startVoice()">🎤</button>
+    <p class="voice-hint" id="voiceHint">Say <strong>"Dallas TX to Nashville TN rate 850"</strong></p>
+  </div>
+
+  <!-- Load profile -->
+  <div class="label">Load Profile</div>
+  <div class="card">
+    <div class="load-grid">
+      <button class="load-btn active" data-type="under" onclick="selectLoad(this,'under')">
+        <div class="lb-icon">📦</div>
+        <div class="lb-name" id="lbl-under">Under Cab</div>
+        <div class="lb-mpg" id="mpg-under">~15 MPG</div>
+      </button>
+      <button class="load-btn" data-type="over" onclick="selectLoad(this,'over')">
+        <div class="lb-icon">📐</div>
+        <div class="lb-name" id="lbl-over">Over Cab</div>
+        <div class="lb-mpg" id="mpg-over">~11 MPG</div>
+      </button>
+      <button class="load-btn" data-type="heavy" onclick="selectLoad(this,'heavy')">
+        <div class="lb-icon">⚖️</div>
+        <div class="lb-name" id="lbl-heavy">Heavy</div>
+        <div class="lb-mpg" id="mpg-heavy">~9 MPG</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings accordion -->
+  <div class="label">Your Numbers</div>
+  <div class="card">
+    <button class="settings-toggle" onclick="toggleSettings()">
+      <span>Fuel, expenses &amp; defaults</span>
+      <span class="settings-toggle-right">
+        <span id="settings-preview" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--dim)"></span>
+        <span class="settings-chevron" id="settings-chevron">▼</span>
+      </span>
+    </button>
+    <div class="settings-body" id="settings-body">
+      <div class="settings-grid">
+        <div class="s-field">
+          <div class="s-label">⛽ Diesel $/gal</div>
+          <input class="s-inp" id="diesel" type="number" value="5.00" step="0.05" inputmode="decimal">
+        </div>
+        <div class="s-field">
+          <div class="s-label">🚗 Avg Speed mph</div>
+          <input class="s-inp" id="avgspeed" type="number" value="70" inputmode="decimal">
+        </div>
+        <div class="s-field">
+          <div class="s-label">🍔 Per Diem $</div>
+          <input class="s-inp" id="perdiem" type="number" value="35" inputmode="decimal">
+        </div>
+        <div class="s-field">
+          <div class="s-label">🅿️ Parking/Lodging $/night</div>
+          <input class="s-inp" id="lodging" type="number" value="75" inputmode="decimal">
+        </div>
+        <div class="s-field">
+          <div class="s-label">🛣️ Tolls Est. $</div>
+          <input class="s-inp" id="tolls" type="number" value="0" inputmode="decimal">
+        </div>
+        <div class="s-field">
+          <div class="s-label">🔧 Wear ¢/mile</div>
+          <input class="s-inp" id="wear" type="number" value="15" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="statusMsg"></div>
+  <button class="calc-btn" onclick="appMode==='single'?calculate():calculateMulti()">Calculate This Load</button>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="verdict" id="verdict">
+      <div class="verdict-num" id="verdictNum"></div>
+      <div class="verdict-label" id="verdictLabel"></div>
+      <div class="verdict-sub" id="verdictSub"></div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat"><div class="st-label">Distance</div><div class="st-val" id="resMiles">—</div><div class="st-sub">miles</div></div>
+      <div class="stat"><div class="st-label">Gross Rate</div><div class="st-val" id="resGross">—</div><div class="st-sub">offered</div></div>
+      <div class="stat"><div class="st-label">Net Profit</div><div class="st-val" id="resNet">—</div><div class="st-sub">after expenses</div></div>
+      <div class="stat"><div class="st-label">Gallons</div><div class="st-val" id="resGallons">—</div><div class="st-sub">diesel needed</div></div>
+    </div>
+    <div class="breakdown">
+      <div class="bk-head">Expense Breakdown</div>
+      <div class="bk-row"><span class="bk-label">⛽ Fuel</span><span class="bk-val" id="bkFuel">—</span></div>
+      <div class="bk-row"><span class="bk-label">🍔 Per Diem</span><span class="bk-val" id="bkFood">—</span></div>
+      <div class="bk-row"><span class="bk-label">🅿️ Parking/Lodging</span><span class="bk-val" id="bkLodging">—</span></div>
+      <div class="bk-row"><span class="bk-label">🛣️ Tolls</span><span class="bk-val" id="bkTolls">—</span></div>
+      <div class="bk-row"><span class="bk-label">🔧 Wear &amp; Tear</span><span class="bk-val" id="bkWear">—</span></div>
+      <div class="bk-row bk-total"><span class="bk-label">Total Expenses</span><span class="bk-val" id="bkTotal">—</span></div>
+    </div>
+    <button class="reset-btn" onclick="resetCalc()">↩ Calculate Another Load</button>
+  </div>
+
+</div>
+
+<div class="footer">
+  <p>
+    Built by a hotshot trucker who got tired of guessing.<br>
+    <a href="mailto:owner@bmh-solutions.com">owner@bmh-solutions.com</a>
+    &nbsp;·&nbsp; <a href="privacy.html">Privacy</a>
+    &nbsp;·&nbsp; <a href="terms.html">Terms</a>
+  </p>
+</div>
+
+<div class="paywall-overlay" id="paywallOverlay">
+  <div class="paywall-sheet">
+    <div class="paywall-title">Unlock <span>LoadCalc</span></div>
+    <p class="paywall-sub">You've used your 10 free calculations. Unlock unlimited access.</p>
+    <div class="plan-grid">
+      <div class="plan-card" id="planMonthly" onclick="selectPlan('monthly')">
+        <div class="plan-name">Monthly</div>
+        <div class="plan-price">$2<span style="font-size:18px">.99</span></div>
+        <div class="plan-per">per month</div>
+        <div class="plan-desc">Cancel anytime</div>
+      </div>
+      <div class="plan-card featured" id="planLifetime" onclick="selectPlan('lifetime')">
+        <div class="plan-badge">BEST VALUE</div>
+        <div class="plan-name">Lifetime</div>
+        <div class="plan-price">$19<span style="font-size:18px">.99</span></div>
+        <div class="plan-per">one time</div>
+        <div class="plan-desc">Pay once, use forever</div>
+      </div>
+    </div>
+    <button class="paywall-cta" id="paywallCta" onclick="handlePayment()">UNLOCK FOR $19.99</button>
+    <button class="paywall-skip" onclick="closePaywall()">Maybe later</button>
+  </div>
+</div>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+// ── Config ──
+const MPG_HOTSHOT  = {under:15, over:11, heavy:9};
+const MPG_SEMI     = {under:6,  over:5.5, heavy:5};
+const DEF_HOTSHOT  = {diesel:5.00, wear:15, perdiem:35, lodging:75, tolls:0,  avgspeed:70};
+const DEF_SEMI     = {diesel:5.00, wear:25, perdiem:80, lodging:100, tolls:15, avgspeed:62};
+const LBL_HOTSHOT  = {under:'Under Cab', over:'Over Cab',  heavy:'Heavy'};
+const LBL_SEMI     = {under:'Loaded',    over:'Oversize',  heavy:'Overweight'};
+const SETTINGS     = ['diesel','avgspeed','perdiem','lodging','tolls','wear'];
+const FREE_LIMIT   = 10;
+
+let truckType    = 'hotshot';
+let MPG          = MPG_HOTSHOT;
+let loadType     = 'under';
+let appMode      = 'single';
+let recognition  = null;
+let selectedPlan = 'lifetime';
+let stops        = [];
+let stopId       = 0;
+let calcCount    = parseInt(localStorage.getItem('lc_count') || '0');
+let isPro        = localStorage.getItem('lc_pro') === '1';
+let settingsOpen = false;
+
+// ── Settings accordion ──
+function toggleSettings() {
+  settingsOpen = !settingsOpen;
+  document.getElementById('settings-body').classList.toggle('open', settingsOpen);
+  document.getElementById('settings-chevron').classList.toggle('open', settingsOpen);
+}
+
+function updateSettingsPreview() {
+  const d = document.getElementById('diesel').value || '5.00';
+  document.getElementById('settings-preview').textContent = '$' + parseFloat(d).toFixed(2) + '/gal';
+}
+updateSettingsPreview();
+document.getElementById('diesel').addEventListener('input', updateSettingsPreview);
+
+// ── Mode ──
+function setMode(mode) {
+  appMode = mode;
+  document.getElementById('mode-single').classList.toggle('active', mode === 'single');
+  document.getElementById('mode-multi').classList.toggle('active',  mode === 'multi');
+  document.getElementById('single-mode').style.display = mode === 'single' ? '' : 'none';
+  document.getElementById('multi-mode').style.display  = mode === 'multi'  ? '' : 'none';
+  document.getElementById('results').classList.remove('show');
+  setStatus('');
+  if (mode === 'multi' && stops.length === 0) { addStop(); addStop(); }
+  updateVoiceHint();
+}
+
+function updateVoiceHint() {
+  const hint = document.getElementById('voiceHint');
+  if (appMode === 'multi') {
+    hint.innerHTML = 'Say <strong>"Stop 1 Dallas TX to Nashville TN rate 850"</strong>';
+  } else {
+    hint.innerHTML = 'Say <strong>"Dallas TX to Nashville TN rate 850"</strong>';
+  }
+}
+
+// ── Multi-stop ──
+function addStop() {
+  stops.push({id: ++stopId, origin:'', dest:'', rate:0});
+  renderStops();
+}
+function removeStop(id) {
+  if (stops.length <= 1) return;
+  stops = stops.filter(s => s.id !== id);
+  renderStops();
+}
+function renderStops() {
+  document.getElementById('stops-container').innerHTML = stops.map((s, i) => `
+    <div class="stop-card">
+      <div class="stop-header">
+        <span class="stop-num">Stop ${i+1}</span>
+        ${stops.length > 1 ? `<button class="stop-remove" onclick="removeStop(${s.id})">✕</button>` : ''}
+      </div>
+      <div class="route-grid" style="border-top:none">
+        <div class="inp-wrap">
+          <span class="inp-label">From</span>
+          <input class="inp" id="s${s.id}-origin" placeholder="Dallas, TX" value="${s.origin}" oninput="stops.find(x=>x.id===${s.id}).origin=this.value">
+          <div class="focus-line"></div>
+        </div>
+        <div class="route-arrow">→</div>
+        <div class="inp-wrap">
+          <span class="inp-label">To</span>
+          <input class="inp" id="s${s.id}-dest" placeholder="Nashville, TN" value="${s.dest}" oninput="stops.find(x=>x.id===${s.id}).dest=this.value">
+          <div class="focus-line"></div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);position:relative">
+        <span class="inp-label">Rate</span>
+        <span class="inp-prefix">$</span>
+        <input class="inp has-prefix" type="number" placeholder="850" value="${s.rate||''}" inputmode="decimal" oninput="stops.find(x=>x.id===${s.id}).rate=parseFloat(this.value)||0">
+        <div class="focus-line"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Truck type ──
+function selectTruck(type) {
+  truckType = type;
+  MPG = type === 'hotshot' ? MPG_HOTSHOT : MPG_SEMI;
+  const lbl  = type === 'hotshot' ? LBL_HOTSHOT : LBL_SEMI;
+  const mpgV = type === 'hotshot' ? MPG_HOTSHOT : MPG_SEMI;
+  const defs = type === 'hotshot' ? DEF_HOTSHOT : DEF_SEMI;
+
+  ['under','over','heavy'].forEach(k => {
+    document.getElementById('lbl-'+k).textContent = lbl[k];
+    document.getElementById('mpg-'+k).textContent = '~' + mpgV[k] + ' MPG';
+  });
+
+  const bh = document.getElementById('btn-hotshot');
+  const bs = document.getElementById('btn-semi');
+  bh.classList.toggle('active', type === 'hotshot');
+  bs.classList.toggle('active', type === 'semi');
+
+  SETTINGS.forEach(id => {
+    const saved = localStorage.getItem('lc_' + type + '_' + id);
+    const el = document.getElementById(id);
+    if (el) el.value = (saved !== null) ? saved : defs[id];
+  });
+  updateSettingsPreview();
+  localStorage.setItem('lc_trucktype', type);
+}
+
+// ── Load type ──
+function selectLoad(el, type) {
+  document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadType = type;
+}
+
+// ── Save settings ──
+function saveSettings() {
+  SETTINGS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value !== '') localStorage.setItem('lc_' + truckType + '_' + id, el.value);
+  });
+  updateSettingsPreview();
+}
+SETTINGS.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', saveSettings);
+});
+
+// ── Trial bar ──
+function updateTrialBar() {
+  if (isPro) { document.getElementById('trialBar').classList.remove('show'); return; }
+  const rem = Math.max(0, FREE_LIMIT - calcCount);
+  if (calcCount > 0) {
+    document.getElementById('trialBar').classList.add('show');
+    document.getElementById('trialText').textContent =
+      rem === 0 ? 'Free calculations used up' :
+      rem === 1 ? '1 free calculation remaining' :
+      rem + ' free calculations remaining';
+  }
+}
+
+// ── Voice ──
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { setStatus('Voice not supported in this browser'); return; }
+  if (recognition) { recognition.stop(); return; }
+  const btn = document.getElementById('voiceBtn');
+  recognition = new SR(); recognition.lang = 'en-US'; recognition.interimResults = true;
+  btn.classList.add('listening'); btn.textContent = '⏹';
+  setStatus('Listening...');
+  recognition.onresult = e => {
+    const t = Array.from(e.results).map(r => r[0].transcript).join('');
+    if (e.results[0].isFinal) { parseVoice(t); if (appMode === 'single') setStatus('Got it: "' + t + '"'); }
+  };
+  recognition.onerror = () => setStatus('Could not hear — try again');
+  recognition.onend = () => { btn.classList.remove('listening'); btn.textContent = '🎤'; recognition = null; };
+  recognition.start();
+}
+
+function parseVoice(text) {
+  const t = text.toLowerCase();
+
+  // Truck / load type — always applies
+  if (t.includes('semi')) selectTruck('semi');
+  else if (t.includes('hotshot')) selectTruck('hotshot');
+  if (t.includes('heavy') || t.includes('overweight')) { const e=document.querySelector('[data-type="heavy"]'); if(e) selectLoad(e,'heavy'); }
+  else if (t.includes('over') || t.includes('oversize')) { const e=document.querySelector('[data-type="over"]'); if(e) selectLoad(e,'over'); }
+
+  if (appMode === 'multi') {
+    // Parse: "Stop 2 Dallas TX..." or "Stop two Dallas TX..."
+    const wordNums = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+    const stopMatch = t.match(/stop\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(.+)/i);
+    if (stopMatch) {
+      const raw = stopMatch[1].toLowerCase();
+      const stopNum = (wordNums[raw] || parseInt(raw)) - 1; // 0-indexed
+      const rest    = stopMatch[2];
+      const rm  = rest.match(/rate\s+\$?(\d+)/i) || rest.match(/\$(\d{3,4})/i);
+      const tm  = rest.match(/^(.+?)\s+to\s+(.+?)(?:\s+rate|\s+\$|\s*$)/i);
+      if (stopNum >= 0 && stopNum < stops.length) {
+        const s = stops[stopNum];
+        if (tm) { s.origin = capCity(tm[1].trim()); s.dest = capCity(tm[2].trim()); }
+        if (rm) { s.rate = parseFloat(rm[1]) || 0; }
+        renderStops();
+        setStatus('Stop ' + (stopNum+1) + ' filled in ✓');
+      } else {
+        setStatus('Stop ' + (stopNum+1) + ' doesn\'t exist — add it first');
+      }
+    } else {
+      setStatus('Say "Stop 1 Dallas TX to Nashville TN rate 850"');
+    }
+  } else {
+    // Single mode — original behavior
+    const rm = t.match(/rate\s+\$?(\d+)/i) || t.match(/\$(\d{3,4})/i);
+    if (rm) document.getElementById('rate').value = rm[1];
+    const tm = t.match(/^(.+?)\s+to\s+(.+?)(?:\s+rate|\s+\$|\s*$)/i);
+    if (tm) {
+      document.getElementById('origin').value = capCity(tm[1].trim());
+      document.getElementById('dest').value   = capCity(tm[2].trim());
+    }
+  }
+}
+
+function capCity(s) {
+  return s.replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/\b(Tx|Tn|Oh|Ga|Fl|Ca|Ny|Il|Pa|Nc|Va|Az|Co|Wa|Or|Mo|Sc|Al|La|Ms|Ar|Ky|Wv|Md|De|Ct|Nj|Ma|Mn|Wi|Mi|Ia|In|Nd|Sd|Ne|Ks|Ok|Nm|Id|Mt|Wy|Nv|Ut)\b/g, m => m.toUpperCase());
+}
+
+// ── Geocode + Route ──
+async function geocode(city) {
+  const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(city + ', USA') + '&format=json&limit=1', {headers:{'Accept-Language':'en'}});
+  const d = await r.json();
+  return d[0] ? {lat:d[0].lat, lon:d[0].lon} : null;
+}
+async function routeMiles(fc, tc) {
+  const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + fc.lon+','+fc.lat+';'+tc.lon+','+tc.lat+'?overview=false');
+  const d = await r.json();
+  return d.routes?.[0] ? Math.round(d.routes[0].distance * 0.000621371) : null;
+}
+
+// ── Calculate single ──
+async function calculate() {
+  if (!isPro && calcCount >= FREE_LIMIT) { showPaywall(); return; }
+  const origin = document.getElementById('origin').value.trim();
+  const dest   = document.getElementById('dest').value.trim();
+  const rate   = parseFloat(document.getElementById('rate').value) || 0;
+  if (!origin || !dest) { setStatus('Enter origin and destination'); return; }
+  if (!rate) { setStatus('Enter the offered rate'); return; }
+  setStatus('Looking up route…');
+  document.getElementById('results').classList.remove('show');
+  try {
+    const [fc, tc] = await Promise.all([geocode(origin), geocode(dest)]);
+    if (!fc) { setStatus('Could not find: ' + origin); return; }
+    if (!tc) { setStatus('Could not find: ' + dest);   return; }
+    setStatus('Calculating…');
+    const miles = await routeMiles(fc, tc);
+    if (!miles) { setStatus('Could not calculate route'); return; }
+    calcCount++; localStorage.setItem('lc_count', calcCount); updateTrialBar();
+    showResults(miles, rate, 1);
+    setStatus('');
+    if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
+  } catch(e) { setStatus('⚠️ Check city names and try again'); }
+}
+
+// ── Calculate multi ──
+async function calculateMulti() {
+  if (!isPro && calcCount >= FREE_LIMIT) { showPaywall(); return; }
+  const valid = stops.filter(s => s.origin.trim() && s.dest.trim() && s.rate > 0);
+  if (valid.length < 1) { setStatus('Fill in at least one complete stop'); return; }
+  setStatus('Calculating multi-stop route…');
+  document.getElementById('results').classList.remove('show');
+  try {
+    let totalMiles = 0, totalRate = 0;
+    const legs = [];
+    for (let i = 0; i < valid.length; i++) {
+      const s = valid[i];
+      setStatus('Route ' + (i+1) + ' of ' + valid.length + '…');
+      const [fc, tc] = await Promise.all([geocode(s.origin), geocode(s.dest)]);
+      if (!fc) { setStatus('Could not find: ' + s.origin); return; }
+      if (!tc) { setStatus('Could not find: ' + s.dest);   return; }
+      const miles = await routeMiles(fc, tc);
+      if (!miles) { setStatus('Could not route stop ' + (i+1)); return; }
+      totalMiles += miles; totalRate += s.rate;
+      legs.push({label: s.origin + ' → ' + s.dest, miles, rate: s.rate});
+    }
+    calcCount++; localStorage.setItem('lc_count', calcCount); updateTrialBar();
+
+    // Run summary
+    const rsRows = legs.map(l =>
+      `<div class="rs-row"><span class="rs-label">${l.label}</span><span class="rs-val">${l.miles.toLocaleString()} mi · $${l.rate.toLocaleString()}</span></div>`
+    ).join('') +
+    `<div class="rs-row rs-total"><span class="rs-label">Total</span><span class="rs-val">${totalMiles.toLocaleString()} mi · $${totalRate.toLocaleString()}</span></div>`;
+    document.getElementById('run-summary-rows').innerHTML = rsRows;
+    document.getElementById('run-summary').style.display = '';
+
+    showResults(totalMiles, totalRate, valid.length);
+    setStatus('');
+    if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
+  } catch(e) { setStatus('⚠️ Check city names and try again'); }
+}
+
+// ── Show results ──
+function showResults(miles, rate, numStops) {
+  const diesel  = parseFloat(document.getElementById('diesel').value)   || 5;
+  const wearCPM = parseFloat(document.getElementById('wear').value)     || 15;
+  const perdiem = parseFloat(document.getElementById('perdiem').value)  || 35;
+  const tolls   = parseFloat(document.getElementById('tolls').value)    || 0;
+  const lodgN   = parseFloat(document.getElementById('lodging').value)  || 75;
+  const speed   = parseFloat(document.getElementById('avgspeed').value) || 70;
+  const mpg     = MPG[loadType];
+
+  const HOS_LIMIT   = 11;
+  const LOADING_HRS = 2 * numStops;
+  const totalHours  = (miles / speed) + LOADING_HRS;
+  const nights      = Math.max(0, Math.floor(totalHours / HOS_LIMIT));
+  const days        = Math.max(1, Math.ceil(totalHours / HOS_LIMIT));
+  const fuel        = (miles / mpg) * diesel;
+  const wear        = miles * (wearCPM / 100);
+  const lodging     = nights * lodgN;
+  const perdiemTotal = perdiem * days;
+  const tollsTotal  = tolls * numStops;
+  const total       = fuel + perdiemTotal + tollsTotal + wear + lodging;
+  const net         = rate - total;
+  const rpm         = rate / miles;
+
+  document.getElementById('resMiles').textContent   = miles.toLocaleString();
+  document.getElementById('resGross').textContent   = '$' + rate.toLocaleString();
+  document.getElementById('resNet').textContent     = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString();
+  document.getElementById('resGallons').textContent = Math.round(miles / mpg);
+  document.getElementById('bkFuel').textContent     = '$' + fuel.toFixed(2);
+  document.getElementById('bkFood').textContent     = '$' + perdiemTotal.toFixed(2) + ' (' + days + ' day' + (days > 1 ? 's' : '') + ')';
+  document.getElementById('bkLodging').textContent  = nights > 0 ? '$' + lodging.toFixed(2) + ' (' + nights + ' night' + (nights > 1 ? 's' : '') + ')' : '$0';
+  document.getElementById('bkTolls').textContent    = '$' + tollsTotal.toFixed(2);
+  document.getElementById('bkWear').textContent     = '$' + wear.toFixed(2);
+  document.getElementById('bkTotal').textContent    = '$' + total.toFixed(2);
+
+  const v  = document.getElementById('verdict');
+  const vn = document.getElementById('verdictNum');
+  const vl = document.getElementById('verdictLabel');
+  const vs = document.getElementById('verdictSub');
+  vn.textContent = '$' + rpm.toFixed(2) + '/mi';
+  if (net >= 0) {
+    v.className = 'verdict go';
+    vl.textContent = numStops > 1 ? '✅ Run Covers Costs' : '✅ Take It';
+    vs.textContent = 'Net $' + Math.round(net).toLocaleString() + ' · ' + miles.toLocaleString() + ' miles' + (nights > 0 ? ' · ' + nights + ' night' + (nights > 1 ? 's' : '') : '');
+  } else if (net >= -50) {
+    v.className = 'verdict maybe';
+    vl.textContent = '🟡 Try to Negotiate';
+    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' short of break-even';
+  } else {
+    v.className = 'verdict no';
+    vl.textContent = '🔴 Don\'t Take It — Loses Money';
+    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' below break-even';
+  }
+
+  // Cascade in
+  const results = document.getElementById('results');
+  results.classList.remove('show');
+  void results.offsetHeight;
+  results.classList.add('show');
+  results.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function resetCalc() {
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('run-summary').style.display = 'none';
+  ['origin','dest','rate'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  setStatus('');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function updateEyebrow() {
+  const pill = document.getElementById('hero-eyebrow');
+  if (isPro) {
+    pill.style.background = 'rgba(0,230,118,.1)';
+    pill.style.borderColor = 'rgba(0,230,118,.2)';
+    pill.style.color = 'var(--green)';
+    pill.innerHTML = '✓ Pro — Unlimited Calculations';
+  }
+}
+
+function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
+function showPaywall()  { document.getElementById('paywallOverlay').classList.add('show'); }
+function closePaywall() { document.getElementById('paywallOverlay').classList.remove('show'); }
+
+function selectPlan(plan) {
+  selectedPlan = plan;
+  document.getElementById('planMonthly').classList.toggle('featured',  plan === 'monthly');
+  document.getElementById('planLifetime').classList.toggle('featured', plan === 'lifetime');
+  document.getElementById('paywallCta').textContent = plan === 'monthly' ? 'UNLOCK FOR $2.99/MONTH' : 'UNLOCK FOR $19.99';
+}
+function handlePayment() {
+  window.location.href = selectedPlan === 'monthly'
+    ? 'https://buy.stripe.com/8x26oH8WNbDB68obY5gQE01'
+    : 'https://buy.stripe.com/fZu5kD1ulazx7cs6DLgQE00';
+}
+
+// ── Init ──
+(function() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('success') === '1') {
+    localStorage.setItem('lc_pro','1'); isPro = true;
+    updateTrialBar(); closePaywall();
+    setStatus('🎉 LoadCalc Pro unlocked. Unlimited calculations.');
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
+
+selectTruck(localStorage.getItem('lc_trucktype') || 'hotshot');
+updateTrialBar();
+updateEyebrow();
+</script>
+</body>
+</html>
