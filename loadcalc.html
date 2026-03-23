@@ -603,6 +603,10 @@
       </span>
     </button>
     <div class="settings-body" id="settings-body">
+      <div class="s-field" style="grid-column:1/-1;margin-bottom:4px">
+        <div class="s-label">📍 Current Location</div>
+        <input class="s-inp" id="curloc" type="text" placeholder="e.g. North Canton OH" style="width:100%">
+      </div>
       <div class="settings-grid">
         <div class="s-field">
           <div class="s-label">⛽ Diesel $/gal</div>
@@ -651,6 +655,7 @@
     </div>
     <div class="breakdown">
       <div class="bk-head">Expense Breakdown</div>
+      <div class="bk-row" id="bkDeadheadRow" style="display:none"><span class="bk-label">📍 Deadhead</span><span class="bk-val" id="bkDeadhead">—</span></div>
       <div class="bk-row"><span class="bk-label">⛽ Fuel</span><span class="bk-val" id="bkFuel">—</span></div>
       <div class="bk-row"><span class="bk-label">🍔 Per Diem</span><span class="bk-val" id="bkFood">—</span></div>
       <div class="bk-row"><span class="bk-label">🅿️ Parking/Lodging</span><span class="bk-val" id="bkLodging">—</span></div>
@@ -726,11 +731,11 @@
 // ── Config ──
 const MPG_HOTSHOT  = {under:15, over:11, heavy:9};
 const MPG_SEMI     = {under:6,  over:5.5, heavy:5};
-const DEF_HOTSHOT  = {diesel:5.00, wear:15, perdiem:35, lodging:75, tolls:0,  avgspeed:70};
-const DEF_SEMI     = {diesel:5.00, wear:25, perdiem:80, lodging:100, tolls:15, avgspeed:62};
+const DEF_HOTSHOT  = {diesel:5.00, wear:15, perdiem:35, lodging:75, tolls:0,  avgspeed:70, curloc:''};
+const DEF_SEMI     = {diesel:5.00, wear:25, perdiem:80, lodging:100, tolls:15, avgspeed:62, curloc:''};
 const LBL_HOTSHOT  = {under:'Under Cab', over:'Over Cab',  heavy:'Heavy'};
 const LBL_SEMI     = {under:'Loaded',    over:'Oversize',  heavy:'Overweight'};
-const SETTINGS     = ['diesel','avgspeed','perdiem','lodging','tolls','wear'];
+const SETTINGS     = ['diesel','avgspeed','perdiem','lodging','tolls','wear','curloc'];
 const FREE_LIMIT   = 10;
 
 let truckType    = 'hotshot';
@@ -1006,6 +1011,7 @@ async function calculate() {
   const origin = document.getElementById('origin').value.trim();
   const dest   = document.getElementById('dest').value.trim();
   const rate   = parseFloat(document.getElementById('rate').value) || 0;
+  const curloc = (document.getElementById('curloc').value || '').trim();
   if (!origin || !dest) { setStatus('Enter origin and destination'); return; }
   if (!rate) { setStatus('Enter the offered rate'); return; }
   setStatus('Looking up route…');
@@ -1017,9 +1023,26 @@ async function calculate() {
     setStatus('Calculating…');
     const miles = await routeMiles(fc, tc);
     if (!miles) { setStatus('Could not calculate route'); return; }
+
+    // Deadhead + return if current location is set
+    let deadheadMiles = 0, returnMiles = 0;
+    if (curloc) {
+      setStatus('Calculating deadhead…');
+      const cc = await geocode(curloc);
+      if (cc) {
+        const [dh, ret] = await Promise.all([routeMiles(cc, fc), routeMiles(tc, cc)]);
+        deadheadMiles = dh || 0;
+        returnMiles = ret || 0;
+      }
+    }
+
     calcCount++; localStorage.setItem('lc_count', calcCount); updateTrialBar();
     if (window.lcTrack) lcTrack('calculate', 'single', origin + ' → ' + dest);
-    showResults(miles, rate, 1);
+    // Save last values
+    localStorage.setItem('lc_last_origin', origin);
+    localStorage.setItem('lc_last_dest', dest);
+    localStorage.setItem('lc_last_rate', rate);
+    showResults(miles, rate, 1, deadheadMiles, returnMiles);
     setStatus('');
     if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
   } catch(e) { setStatus('⚠️ Check city names and try again'); }
@@ -1030,6 +1053,7 @@ async function calculateMulti() {
   if (!isPro && calcCount >= FREE_LIMIT) { showPaywall(); return; }
   const valid = stops.filter(s => s.origin.trim() && s.dest.trim() && s.rate > 0);
   if (valid.length < 1) { setStatus('Fill in at least one complete stop'); return; }
+  const curloc = (document.getElementById('curloc').value || '').trim();
   setStatus('Calculating multi-stop route…');
   document.getElementById('results').classList.remove('show');
   try {
@@ -1046,6 +1070,20 @@ async function calculateMulti() {
       totalMiles += miles; totalRate += s.rate;
       legs.push({label: s.origin + ' → ' + s.dest, miles, rate: s.rate});
     }
+
+    // Deadhead + return if current location is set
+    let deadheadMiles = 0, returnMiles = 0;
+    if (curloc) {
+      setStatus('Calculating deadhead…');
+      const cc = await geocode(curloc);
+      if (cc) {
+        const firstPickup = await geocode(valid[0].origin);
+        const lastDrop = await geocode(valid[valid.length - 1].dest);
+        if (firstPickup) deadheadMiles = (await routeMiles(cc, firstPickup)) || 0;
+        if (lastDrop) returnMiles = (await routeMiles(lastDrop, cc)) || 0;
+      }
+    }
+
     calcCount++; localStorage.setItem('lc_count', calcCount); updateTrialBar();
     if (window.lcTrack) lcTrack('calculate', 'multi', valid.length + ' stops');
 
@@ -1057,14 +1095,16 @@ async function calculateMulti() {
     document.getElementById('run-summary-rows').innerHTML = rsRows;
     document.getElementById('run-summary').style.display = '';
 
-    showResults(totalMiles, totalRate, valid.length);
+    showResults(totalMiles, totalRate, valid.length, deadheadMiles, returnMiles);
     setStatus('');
     if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
   } catch(e) { setStatus('⚠️ Check city names and try again'); }
 }
 
 // ── Show results ──
-function showResults(miles, rate, numStops) {
+function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
+  deadheadMiles = deadheadMiles || 0;
+  returnMiles = returnMiles || 0;
   const diesel  = parseFloat(document.getElementById('diesel').value)   || 5;
   const wearCPM = parseFloat(document.getElementById('wear').value)     || 15;
   const perdiem = parseFloat(document.getElementById('perdiem').value)  || 35;
@@ -1075,27 +1115,41 @@ function showResults(miles, rate, numStops) {
 
   const HOS_LIMIT   = 11;
   const LOADING_HRS = 2 * numStops;
-  const totalHours  = (miles / speed) + LOADING_HRS;
+  // Total trip includes deadhead + load + return
+  const unpaidMiles = deadheadMiles + returnMiles;
+  const totalTripMiles = miles + unpaidMiles;
+  const totalHours  = (totalTripMiles / speed) + LOADING_HRS;
   const nights      = Math.max(0, Math.floor(totalHours / HOS_LIMIT));
   const days        = Math.max(1, Math.ceil(totalHours / HOS_LIMIT));
-  const fuel        = (miles / mpg) * diesel;
-  const wear        = miles * (wearCPM / 100);
+  // Fuel & wear cover ALL miles (paid + unpaid)
+  const fuel        = (totalTripMiles / mpg) * diesel;
+  const wear        = totalTripMiles * (wearCPM / 100);
   const lodging     = nights * lodgN;
   const perdiemTotal = perdiem * days;
   const tollsTotal  = tolls * numStops;
   const total       = fuel + perdiemTotal + tollsTotal + wear + lodging;
   const net         = rate - total;
-  const rpm         = rate / miles;
+  const rpm         = rate / miles; // RPM based on paid miles only
+
+  // Deadhead row
+  const dhRow = document.getElementById('bkDeadheadRow');
+  if (unpaidMiles > 0) {
+    const dhFuel = (unpaidMiles / mpg) * diesel;
+    dhRow.style.display = '';
+    document.getElementById('bkDeadhead').textContent = unpaidMiles.toLocaleString() + ' mi · $' + dhFuel.toFixed(2) + ' fuel';
+  } else {
+    dhRow.style.display = 'none';
+  }
 
   document.getElementById('resMiles').textContent   = miles.toLocaleString();
   document.getElementById('resGross').textContent   = '$' + rate.toLocaleString();
   document.getElementById('resNet').textContent     = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString();
-  document.getElementById('resGallons').textContent = Math.round(miles / mpg);
-  document.getElementById('bkFuel').textContent     = '$' + fuel.toFixed(2);
+  document.getElementById('resGallons').textContent = Math.round(totalTripMiles / mpg);
+  document.getElementById('bkFuel').textContent     = '$' + fuel.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
   document.getElementById('bkFood').textContent     = '$' + perdiemTotal.toFixed(2) + ' (' + days + ' day' + (days > 1 ? 's' : '') + ')';
   document.getElementById('bkLodging').textContent  = nights > 0 ? '$' + lodging.toFixed(2) + ' (' + nights + ' night' + (nights > 1 ? 's' : '') + ')' : '$0';
   document.getElementById('bkTolls').textContent    = '$' + tollsTotal.toFixed(2);
-  document.getElementById('bkWear').textContent     = '$' + wear.toFixed(2);
+  document.getElementById('bkWear').textContent     = '$' + wear.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
   document.getElementById('bkTotal').textContent    = '$' + total.toFixed(2);
 
   const v  = document.getElementById('verdict');
@@ -1103,18 +1157,19 @@ function showResults(miles, rate, numStops) {
   const vl = document.getElementById('verdictLabel');
   const vs = document.getElementById('verdictSub');
   vn.textContent = '$' + rpm.toFixed(2) + '/mi';
+  const dhNote = unpaidMiles > 0 ? ' · ' + unpaidMiles.toLocaleString() + ' deadhead' : '';
   if (net >= 0) {
     v.className = 'verdict go';
     vl.textContent = numStops > 1 ? '✅ Run Covers Costs' : '✅ Take It';
-    vs.textContent = 'Net $' + Math.round(net).toLocaleString() + ' · ' + miles.toLocaleString() + ' miles' + (nights > 0 ? ' · ' + nights + ' night' + (nights > 1 ? 's' : '') : '');
+    vs.textContent = 'Net $' + Math.round(net).toLocaleString() + ' · ' + miles.toLocaleString() + ' miles' + (nights > 0 ? ' · ' + nights + ' night' + (nights > 1 ? 's' : '') : '') + dhNote;
   } else if (net >= -50) {
     v.className = 'verdict maybe';
     vl.textContent = '🟡 Try to Negotiate';
-    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' short of break-even';
+    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' short of break-even' + dhNote;
   } else {
     v.className = 'verdict no';
     vl.textContent = '🔴 Don\'t Take It — Loses Money';
-    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' below break-even';
+    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' below break-even' + dhNote;
   }
 
   // Cascade in
@@ -1294,6 +1349,16 @@ selectTruck(localStorage.getItem('lc_trucktype') || 'hotshot');
 updateTrialBar();
 updateEyebrow();
 updateRestoreLink();
+
+// Restore last from/to/rate values
+(function() {
+  const lo = localStorage.getItem('lc_last_origin');
+  const ld = localStorage.getItem('lc_last_dest');
+  const lr = localStorage.getItem('lc_last_rate');
+  if (lo) document.getElementById('origin').value = lo;
+  if (ld) document.getElementById('dest').value = ld;
+  if (lr) document.getElementById('rate').value = lr;
+})();
 
 // Enter key on rate field triggers calculate
 document.getElementById('rate').addEventListener('keydown', function(e) {
