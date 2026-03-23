@@ -1132,9 +1132,10 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   const totalTripMiles = miles + unpaidMiles;
   const totalHours  = (totalTripMiles / speed) + LOADING_HRS;
   let nights        = Math.max(0, Math.floor(totalHours / HOS_LIMIT));
-  // If not going home but has deadhead, include at least 1 night at delivery
-  if (!getHome && deadheadMiles > 0 && nights < 1) nights = 1;
-  const days        = Math.max(1, Math.ceil(totalHours / HOS_LIMIT));
+  // If current location is set, add 1 night at delivery (rest before next move)
+  const hasCurLoc = (document.getElementById('curloc').value || '').trim().length > 0;
+  if (hasCurLoc) nights += 1;
+  const days        = Math.max(1, nights + 1);
   // Fuel & wear cover ALL miles (paid + unpaid)
   const fuel        = (totalTripMiles / mpg) * diesel;
   const wear        = totalTripMiles * (wearCPM / 100);
