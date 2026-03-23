@@ -322,9 +322,11 @@
   </div>
 </footer>
 
+<script src="analytics.js"></script>
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 function stripeLifetime() {
+  if (window.lcTrack) lcTrack('payment_click', 'lifetime');
   window.location.href = 'https://buy.stripe.com/fZu5kD1ulazx7cs6DLgQE00';
 }
 </script>

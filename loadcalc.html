@@ -823,6 +823,7 @@ function renderStops() {
 
 // ── Truck type ──
 function selectTruck(type) {
+  if (window.lcTrack) lcTrack('truck_type', type);
   truckType = type;
   MPG = type === 'hotshot' ? MPG_HOTSHOT : MPG_SEMI;
   const lbl  = type === 'hotshot' ? LBL_HOTSHOT : LBL_SEMI;
@@ -850,6 +851,7 @@ function selectTruck(type) {
 
 // ── Load type ──
 function selectLoad(el, type) {
+  if (window.lcTrack) lcTrack('load_type', type);
   document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   loadType = type;
@@ -891,6 +893,7 @@ function startVoice() {
     return;
   }
   if (recognition) { recognition.stop(); return; }
+  if (window.lcTrack) lcTrack('voice_start');
   const btn = document.getElementById('voiceBtn');
   recognition = new SR(); recognition.lang = 'en-US'; recognition.interimResults = true;
   btn.classList.add('listening'); btn.textContent = '⏹';
@@ -905,6 +908,7 @@ function startVoice() {
 }
 
 function parseVoice(text) {
+  if (window.lcTrack) lcTrack('voice_success', text.substring(0, 100));
   const t = text.toLowerCase();
 
   // Truck / load type — always applies
@@ -1014,6 +1018,7 @@ async function calculate() {
     const miles = await routeMiles(fc, tc);
     if (!miles) { setStatus('Could not calculate route'); return; }
     calcCount++; localStorage.setItem('lc_count', calcCount); updateTrialBar();
+    if (window.lcTrack) lcTrack('calculate', 'single', origin + ' → ' + dest);
     showResults(miles, rate, 1);
     setStatus('');
     if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
@@ -1042,6 +1047,7 @@ async function calculateMulti() {
       legs.push({label: s.origin + ' → ' + s.dest, miles, rate: s.rate});
     }
     calcCount++; localStorage.setItem('lc_count', calcCount); updateTrialBar();
+    if (window.lcTrack) lcTrack('calculate', 'multi', valid.length + ' stops');
 
     // Run summary
     const rsRows = legs.map(l =>
@@ -1138,7 +1144,7 @@ function updateEyebrow() {
 }
 
 function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
-function showPaywall()  { document.getElementById('paywallOverlay').classList.add('show'); }
+function showPaywall()  { if (window.lcTrack) lcTrack('paywall_shown', '', calcCount); document.getElementById('paywallOverlay').classList.add('show'); }
 function closePaywall() { document.getElementById('paywallOverlay').classList.remove('show'); }
 
 function selectPlan(plan) {
@@ -1148,6 +1154,7 @@ function selectPlan(plan) {
   document.getElementById('paywallCta').textContent = plan === 'monthly' ? 'UNLOCK FOR $2.99/MONTH' : 'UNLOCK FOR $19.99';
 }
 function handlePayment() {
+  if (window.lcTrack) lcTrack('payment_click', selectedPlan);
   window.location.href = selectedPlan === 'monthly'
     ? 'https://buy.stripe.com/8x26oH8WNbDB68obY5gQE01'
     : 'https://buy.stripe.com/fZu5kD1ulazx7cs6DLgQE00';
@@ -1288,5 +1295,6 @@ updateTrialBar();
 updateEyebrow();
 updateRestoreLink();
 </script>
+<script src="analytics.js"></script>
 </body>
 </html>
