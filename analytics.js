@@ -12,7 +12,7 @@
   var page = location.pathname.split('/').pop() || 'index.html';
 
   function send(event, label, value) {
-    if (ENDPOINT === 'https://script.google.com/macros/s/AKfycbypBXf9HXzcJzvhzZWmYkYhFrrwIKSe2HOAii2F7fXrN9641nqBxlBP4ffQ4iOALXar/exec') return; // skip if not configured
+    if (!ENDPOINT || ENDPOINT.includes('URL_HERE')) return; // skip if not configured
     var data = {
       timestamp: new Date().toISOString(),
       page: page,
