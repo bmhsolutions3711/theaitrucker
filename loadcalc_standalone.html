@@ -271,6 +271,9 @@
   <div class="field" style="margin-bottom:8px">
     <label>📍 Current Location</label>
     <input class="inp" id="curloc" type="text" placeholder="e.g. North Canton OH">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:#888;cursor:pointer">
+      <input type="checkbox" id="gethome" style="accent-color:#FFD600;width:16px;height:16px;cursor:pointer"> Get me home (include return trip)
+    </label>
   </div>
   <div class="settings-grid">
     <div class="field" style="margin-bottom:0">
@@ -397,6 +400,11 @@
   function loadSettings() { SETTINGS.forEach(id => { const v=localStorage.getItem('lc_'+id); const el=document.getElementById(id); if(v&&el) el.value=v; }); }
   SETTINGS.forEach(id => { const el=document.getElementById(id); if(el) el.addEventListener('change', saveSettings); });
   loadSettings();
+  // Persist "Get me home" checkbox
+  document.getElementById('gethome').checked = localStorage.getItem('lc_gethome') === '1';
+  document.getElementById('gethome').addEventListener('change', function() {
+    localStorage.setItem('lc_gethome', this.checked ? '1' : '0');
+  });
 
   // ── Trial bar ──
   function updateTrialBar() {
@@ -494,13 +502,13 @@
 
       // Deadhead + return if current location set
       let deadheadMiles = 0, returnMiles = 0;
+      const getHome = document.getElementById('gethome').checked;
       if (curloc) {
         setStatus('📡 Calculating deadhead...');
         const cc = await geocode(curloc);
         if (cc) {
-          const [dh, ret] = await Promise.all([routeMiles(cc, fromC), routeMiles(toC, cc)]);
-          deadheadMiles = dh || 0;
-          returnMiles = ret || 0;
+          deadheadMiles = (await routeMiles(cc, fromC)) || 0;
+          if (getHome) returnMiles = (await routeMiles(toC, cc)) || 0;
         }
       }
 
@@ -549,7 +557,9 @@
     const fuelCost = (totalTripMiles / mpg) * diesel;
     const wearCost = totalTripMiles * (wearCPM / 100);
     const hours    = totalTripMiles / speed;
-    const nights   = Math.max(0, Math.floor(hours / 10));
+    const getHome  = document.getElementById('gethome').checked;
+    let nights     = Math.max(0, Math.floor(hours / 10));
+    if (!getHome && deadheadMiles > 0 && nights < 1) nights = 1;
     const days     = Math.max(1, nights + 1);
     const lodging  = nights * lodgingN;
     const total    = fuelCost + perdiem + tolls + wearCost + lodging;
