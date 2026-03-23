@@ -550,6 +550,7 @@
     const wearCost = totalTripMiles * (wearCPM / 100);
     const hours    = totalTripMiles / speed;
     const nights   = Math.max(0, Math.floor(hours / 10));
+    const days     = Math.max(1, nights + 1);
     const lodging  = nights * lodgingN;
     const total    = fuelCost + perdiem + tolls + wearCost + lodging;
     const net      = rate - total;
@@ -581,20 +582,22 @@
     const num   = document.getElementById('verdictNum');
     const sub   = document.getElementById('verdictSub');
     num.textContent = '$' + rpm.toFixed(2) + '/mi';
+    const dailyNet = net / days;
     const dhNote = unpaidMiles > 0 ? ' · ' + unpaidMiles.toLocaleString() + ' deadhead' : '';
+    const dayInfo = days + ' day' + (days > 1 ? 's' : '');
 
-    if (net >= 0) {
-      v.className = 'verdict go';
-      label.textContent = '✅ Take It — Covers Costs';
-      sub.textContent = `Net $${Math.round(net).toLocaleString()} profit · ${miles} miles` + dhNote;
-    } else if (net >= -50) {
-      v.className = 'verdict maybe';
-      label.textContent = '🟡 Close — Try to Negotiate';
-      sub.textContent = `$${Math.round(Math.abs(net)).toLocaleString()} short of break-even` + dhNote;
-    } else {
+    if (net < 0) {
       v.className = 'verdict no';
-      label.textContent = '🔴 Pass — Loses Money';
-      sub.textContent = `$${Math.round(Math.abs(net)).toLocaleString()} below break-even` + dhNote;
+      label.textContent = '🔴 Don\'t Take It — Loses Money';
+      sub.textContent = `$${Math.round(Math.abs(net)).toLocaleString()} below break-even · ${dayInfo}` + dhNote;
+    } else if (dailyNet < 300) {
+      v.className = 'verdict maybe';
+      label.textContent = '🟡 Consider — Low Profit';
+      sub.textContent = `$${Math.round(dailyNet).toLocaleString()}/day · $${Math.round(net).toLocaleString()} net · ${dayInfo}` + dhNote;
+    } else {
+      v.className = 'verdict go';
+      label.textContent = '✅ Take It';
+      sub.textContent = `$${Math.round(dailyNet).toLocaleString()}/day · $${Math.round(net).toLocaleString()} net · ${dayInfo}` + dhNote;
     }
 
     document.getElementById('results').classList.add('show');

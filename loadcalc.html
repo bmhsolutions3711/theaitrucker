@@ -1157,19 +1157,21 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   const vl = document.getElementById('verdictLabel');
   const vs = document.getElementById('verdictSub');
   vn.textContent = '$' + rpm.toFixed(2) + '/mi';
+  const dailyNet = net / days;
   const dhNote = unpaidMiles > 0 ? ' · ' + unpaidMiles.toLocaleString() + ' deadhead' : '';
-  if (net >= 0) {
-    v.className = 'verdict go';
-    vl.textContent = numStops > 1 ? '✅ Run Covers Costs' : '✅ Take It';
-    vs.textContent = 'Net $' + Math.round(net).toLocaleString() + ' · ' + miles.toLocaleString() + ' miles' + (nights > 0 ? ' · ' + nights + ' night' + (nights > 1 ? 's' : '') : '') + dhNote;
-  } else if (net >= -50) {
-    v.className = 'verdict maybe';
-    vl.textContent = '🟡 Try to Negotiate';
-    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' short of break-even' + dhNote;
-  } else {
+  const dayInfo = days + ' day' + (days > 1 ? 's' : '');
+  if (net < 0) {
     v.className = 'verdict no';
     vl.textContent = '🔴 Don\'t Take It — Loses Money';
-    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' below break-even' + dhNote;
+    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' below break-even · ' + dayInfo + dhNote;
+  } else if (dailyNet < 300) {
+    v.className = 'verdict maybe';
+    vl.textContent = '🟡 Consider — Low Profit';
+    vs.textContent = '$' + Math.round(dailyNet).toLocaleString() + '/day · $' + Math.round(net).toLocaleString() + ' net · ' + dayInfo + dhNote;
+  } else {
+    v.className = 'verdict go';
+    vl.textContent = '✅ Take It';
+    vs.textContent = '$' + Math.round(dailyNet).toLocaleString() + '/day · $' + Math.round(net).toLocaleString() + ' net · ' + dayInfo + dhNote;
   }
 
   // Cascade in
