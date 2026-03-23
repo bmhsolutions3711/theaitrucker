@@ -5,14 +5,14 @@
 */
 (function() {
   // ⚠️ Replace this URL after deploying the Google Apps Script
-  var ENDPOINT = 'APPS_SCRIPT_URL_HERE';
+  var ENDPOINT = 'https://script.google.com/macros/s/AKfycbypBXf9HXzcJzvhzZWmYkYhFrrwIKSe2HOAii2F7fXrN9641nqBxlBP4ffQ4iOALXar/exec';
 
   // Random session ID (not stored between visits)
   var sid = Math.random().toString(36).slice(2, 10);
   var page = location.pathname.split('/').pop() || 'index.html';
 
   function send(event, label, value) {
-    if (ENDPOINT === 'APPS_SCRIPT_URL_HERE') return; // skip if not configured
+    if (ENDPOINT === 'https://script.google.com/macros/s/AKfycbypBXf9HXzcJzvhzZWmYkYhFrrwIKSe2HOAii2F7fXrN9641nqBxlBP4ffQ4iOALXar/exec') return; // skip if not configured
     var data = {
       timestamp: new Date().toISOString(),
       page: page,
