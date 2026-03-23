@@ -1146,23 +1146,20 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   const mpg     = MPG[loadType];
 
   const HOS_LIMIT   = 10;  // realistic daily drive hours (legal max 11, but buffer for traffic)
-  const LOADING_HRS = 2 * numStops;
   const getHome     = document.getElementById('gethome').checked;
-  // Total trip includes deadhead + load + return
+  // Total trip: only driving miles (loading time is minimal for single loads)
   const unpaidMiles = deadheadMiles + returnMiles;
   const totalTripMiles = miles + unpaidMiles;
-  const totalHours  = (totalTripMiles / speed) + LOADING_HRS;
-  let nights        = Math.max(0, Math.floor(totalHours / HOS_LIMIT));
+  const driveHours  = totalTripMiles / speed;
+  const nights      = Math.max(0, Math.ceil(driveHours / HOS_LIMIT) - 1);
   // If current location is set but NOT going home, add 1 night at delivery
-  // (you'll be at the delivery location overnight before your next move)
-  // If going home, HOS calc already covers overnights for the full round trip
   const hasCurLoc = (document.getElementById('curloc').value || '').trim().length > 0;
-  if (hasCurLoc && !getHome) nights += 1;
-  const days        = Math.max(1, nights + 1);
+  const totalNights = (hasCurLoc && !getHome) ? nights + 1 : nights;
+  const days        = totalNights + 1;
   // Fuel & wear cover ALL miles (paid + unpaid)
   const fuel        = (totalTripMiles / mpg) * diesel;
   const wear        = totalTripMiles * (wearCPM / 100);
-  const lodging     = nights * lodgN;
+  const lodging     = totalNights * lodgN;
   const perdiemTotal = perdiem * days;
   const tollsTotal  = tolls * numStops;
   const total       = fuel + perdiemTotal + tollsTotal + wear + lodging;
@@ -1185,7 +1182,7 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   document.getElementById('resGallons').textContent = Math.round(totalTripMiles / mpg);
   document.getElementById('bkFuel').textContent     = '$' + fuel.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
   document.getElementById('bkFood').textContent     = '$' + perdiemTotal.toFixed(2) + ' (' + days + ' day' + (days > 1 ? 's' : '') + ')';
-  document.getElementById('bkLodging').textContent  = nights > 0 ? '$' + lodging.toFixed(2) + ' (' + nights + ' night' + (nights > 1 ? 's' : '') + ')' : '$0';
+  document.getElementById('bkLodging').textContent  = totalNights > 0 ? '$' + lodging.toFixed(2) + ' (' + totalNights + ' night' + (totalNights > 1 ? 's' : '') + ')' : '$0';
   document.getElementById('bkTolls').textContent    = '$' + tollsTotal.toFixed(2);
   document.getElementById('bkWear').textContent     = '$' + wear.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
   document.getElementById('bkTotal').textContent    = '$' + total.toFixed(2);
