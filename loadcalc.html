@@ -1294,6 +1294,14 @@ selectTruck(localStorage.getItem('lc_trucktype') || 'hotshot');
 updateTrialBar();
 updateEyebrow();
 updateRestoreLink();
+
+// Enter key on rate field triggers calculate
+document.getElementById('rate').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    appMode === 'single' ? calculate() : calculateMulti();
+  }
+});
 </script>
 <script src="analytics.js"></script>
 </body>

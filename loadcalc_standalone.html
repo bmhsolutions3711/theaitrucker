@@ -598,6 +598,11 @@
       window.history.replaceState({}, '', window.location.pathname);
     }
   })();
+
+  // Enter key on rate field triggers calculate
+  document.getElementById('rate').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); calculate(); }
+  });
 </script>
 <script src="analytics.js"></script>
 </body>
