@@ -606,7 +606,10 @@
     <div class="settings-body" id="settings-body">
       <div class="s-field" style="grid-column:1/-1;margin-bottom:4px">
         <div class="s-label">📍 Current Location</div>
-        <input class="s-inp" id="curloc" type="text" placeholder="e.g. North Canton OH" style="width:100%">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="s-inp" id="curloc" type="text" placeholder="e.g. North Canton OH" style="flex:1">
+          <button id="gpsBtn" onclick="detectLocation()" style="background:var(--yellow);color:#000;border:none;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;white-space:nowrap;font-weight:600" title="Use my location">📍 GPS</button>
+        </div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--mid);cursor:pointer">
           <input type="checkbox" id="gethome" style="accent-color:var(--yellow);width:16px;height:16px;cursor:pointer"> Get me home (include return trip)
         </label>
@@ -1216,6 +1219,40 @@ function updateEyebrow() {
 }
 
 function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
+
+// ── GPS location detection ──
+function detectLocation() {
+  if (!navigator.geolocation) { setStatus('GPS not supported in this browser'); return; }
+  const btn = document.getElementById('gpsBtn');
+  btn.textContent = '⏳'; btn.disabled = true;
+  setStatus('Getting your location…');
+  navigator.geolocation.getCurrentPosition(
+    async function(pos) {
+      try {
+        const lat = pos.coords.latitude, lon = pos.coords.longitude;
+        const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&addressdetails=1', { headers: {'Accept-Language':'en'} });
+        const d = await r.json();
+        const a = d.address || {};
+        const city = a.city || a.town || a.village || a.hamlet || '';
+        const state = a.state || '';
+        const loc = city + (city && state ? ', ' : '') + state;
+        if (loc) {
+          document.getElementById('curloc').value = loc;
+          saveSettings();
+          setStatus('📍 ' + loc);
+        } else {
+          setStatus('Could not determine city from GPS');
+        }
+      } catch(e) { setStatus('Could not look up location'); }
+      btn.textContent = '📍 GPS'; btn.disabled = false;
+    },
+    function(err) {
+      setStatus(err.code === 1 ? 'Location permission denied' : 'Could not get location');
+      btn.textContent = '📍 GPS'; btn.disabled = false;
+    },
+    { enableHighAccuracy: false, timeout: 10000 }
+  );
+}
 function showPaywall()  { if (window.lcTrack) lcTrack('paywall_shown', '', calcCount); document.getElementById('paywallOverlay').classList.add('show'); }
 function closePaywall() { document.getElementById('paywallOverlay').classList.remove('show'); }
 
