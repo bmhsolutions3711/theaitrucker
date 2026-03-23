@@ -7,8 +7,10 @@
   // ⚠️ Replace this URL after deploying the Google Apps Script
   var ENDPOINT = 'https://script.google.com/macros/s/AKfycbypBXf9HXzcJzvhzZWmYkYhFrrwIKSe2HOAii2F7fXrN9641nqBxlBP4ffQ4iOALXar/exec';
 
-  // Random session ID (not stored between visits)
-  var sid = Math.random().toString(36).slice(2, 10);
+  // Persistent anonymous user ID (survives between visits, no PII)
+  var uid = localStorage.getItem('lc_uid');
+  if (!uid) { uid = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); localStorage.setItem('lc_uid', uid); }
+  var sid = uid;
   var page = location.pathname.split('/').pop() || 'index.html';
 
   function send(event, label, value) {
