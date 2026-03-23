@@ -231,6 +231,17 @@
     .ac-item:last-child { border-bottom:none; }
     .ac-item:hover, .ac-item.active { background:var(--yellow2); color:var(--yellow); }
     .ac-item .ac-sub { font-size:11px; color:var(--dim); margin-top:2px; }
+    /* Weather warning banner */
+    .wx-banner {
+      display:none; margin:12px 0; padding:14px 18px;
+      border-radius:var(--r); font-size:13px; line-height:1.5;
+      border-left:4px solid;
+    }
+    .wx-banner.show { display:block; }
+    .wx-banner.warn { background:rgba(255,152,0,.1); border-color:#ff9800; color:#ffb74d; }
+    .wx-banner.danger { background:rgba(255,68,68,.1); border-color:#ff4444; color:#ff6666; }
+    .wx-banner .wx-title { font-weight:700; font-size:14px; margin-bottom:4px; }
+    .wx-banner .wx-detail { font-size:12px; opacity:0.85; }
     .route-arrow {
       display:flex; align-items:center; justify-content:center;
       width:32px; color:var(--dim); font-size:14px;
@@ -687,6 +698,10 @@
       <div class="bk-row"><span class="bk-label">🔧 Wear &amp; Tear</span><span class="bk-val" id="bkWear">—</span></div>
       <div class="bk-row bk-total"><span class="bk-label">Total Expenses</span><span class="bk-val" id="bkTotal">—</span></div>
     </div>
+    <div class="wx-banner" id="wxBanner">
+      <div class="wx-title" id="wxTitle"></div>
+      <div class="wx-detail" id="wxDetail"></div>
+    </div>
     <button class="reset-btn" onclick="resetCalc()">↩ Calculate Another Load</button>
   </div>
 
@@ -1073,6 +1088,7 @@ async function calculate() {
     localStorage.setItem('lc_last_rate', rate);
     showResults(miles, rate, 1, deadheadMiles, returnMiles);
     setStatus('');
+    checkRouteWeather(fc, tc);
     if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
   } catch(e) { setStatus('⚠️ Check city names and try again'); }
 }
@@ -1129,6 +1145,10 @@ async function calculateMulti() {
 
     showResults(totalMiles, totalRate, valid.length, deadheadMiles, returnMiles);
     setStatus('');
+    // Weather check: first pickup → last delivery
+    const wxFrom = await geocode(valid[0].origin);
+    const wxTo = await geocode(valid[valid.length - 1].dest);
+    if (wxFrom && wxTo) checkRouteWeather(wxFrom, wxTo);
     if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
   } catch(e) { setStatus('⚠️ Check city names and try again'); }
 }
@@ -1220,6 +1240,7 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
 function resetCalc() {
   document.getElementById('results').classList.remove('show');
   document.getElementById('run-summary').style.display = 'none';
+  document.getElementById('wxBanner').classList.remove('show','warn','danger');
   ['origin','dest','rate'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   setStatus('');
   window.scrollTo({top:0, behavior:'smooth'});
@@ -1310,6 +1331,60 @@ function updateEyebrow() {
 })();
 
 function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
+
+// ── Route weather check ──
+const OWM_KEY = '2100c08faa7729bbd1d620c0f8b7d104';
+const WX_BAD = new Set([200,201,202,210,211,212,221,230,231,232, // thunderstorm
+  502,503,504,511,       // heavy/freezing rain
+  600,601,602,611,612,613,615,616,620,621,622, // snow
+  711,731,751,761,762,771,781 // smoke, dust, tornado
+]);
+
+async function checkRouteWeather(fromCoords, toCoords) {
+  const banner = document.getElementById('wxBanner');
+  banner.classList.remove('show','warn','danger');
+  try {
+    // 3 points: origin, midpoint, destination
+    const mid = { lat: (parseFloat(fromCoords.lat) + parseFloat(toCoords.lat)) / 2, lon: (parseFloat(fromCoords.lon) + parseFloat(toCoords.lon)) / 2 };
+    const points = [
+      { label: 'Pickup', lat: fromCoords.lat, lon: fromCoords.lon },
+      { label: 'Midpoint', lat: mid.lat, lon: mid.lon },
+      { label: 'Delivery', lat: toCoords.lat, lon: toCoords.lon }
+    ];
+    const results = await Promise.all(points.map(p =>
+      fetch('https://api.openweathermap.org/data/2.5/weather?lat=' + p.lat + '&lon=' + p.lon + '&appid=' + OWM_KEY + '&units=imperial')
+        .then(r => r.json())
+        .then(d => ({ label: p.label, weather: d.weather?.[0] || {}, main: d.main || {}, name: d.name || '' }))
+    ));
+
+    const warnings = [];
+    let isDanger = false;
+    results.forEach(r => {
+      const id = r.weather.id || 0;
+      const desc = r.weather.description || '';
+      const temp = r.main.temp || 50;
+      const loc = r.name || r.label;
+
+      if (WX_BAD.has(id)) {
+        warnings.push('⚠️ ' + loc + ': ' + desc);
+        if (id >= 600 && id < 700) isDanger = true; // snow/ice = danger
+        if (id >= 200 && id < 300) isDanger = true; // thunderstorm = danger
+      }
+      if (temp <= 32) {
+        warnings.push('🥶 ' + loc + ': ' + Math.round(temp) + '°F — freezing conditions');
+        isDanger = true;
+      } else if (temp <= 40) {
+        warnings.push('❄️ ' + loc + ': ' + Math.round(temp) + '°F — near freezing');
+      }
+    });
+
+    if (warnings.length) {
+      document.getElementById('wxTitle').textContent = isDanger ? '🚨 Hazardous Weather on Route' : '⚠️ Weather Advisory';
+      document.getElementById('wxDetail').innerHTML = warnings.join('<br>');
+      banner.className = 'wx-banner show ' + (isDanger ? 'danger' : 'warn');
+    }
+  } catch(e) { /* silently fail — weather is advisory only */ }
+}
 
 // ── GPS location detection ──
 function detectLocation() {
