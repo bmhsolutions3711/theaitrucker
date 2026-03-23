@@ -1273,6 +1273,7 @@ async function verifyRestore() {
       updateRestoreLink();
       document.getElementById('restoreMsg').style.color = 'var(--green)';
       document.getElementById('restoreMsg').textContent = '✓ Access restored!';
+      if (window.lcTrack) lcTrack('email_registered', email, 'restore');
       setTimeout(closeRestore, 1200);
     } else {
       document.getElementById('restoreMsg').style.color = '#FF4444';
@@ -1323,6 +1324,7 @@ function submitSuccessEmail() {
   if (email && email.includes('@')) {
     localStorage.setItem('lc_pro_email', email);
     registerProEmail(email);
+    if (window.lcTrack) lcTrack('email_registered', email, 'payment');
   }
   closeSuccessOverlay();
 }
