@@ -1135,9 +1135,11 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   const totalTripMiles = miles + unpaidMiles;
   const totalHours  = (totalTripMiles / speed) + LOADING_HRS;
   let nights        = Math.max(0, Math.floor(totalHours / HOS_LIMIT));
-  // If current location is set, add 1 night at delivery (rest before next move)
+  // If current location is set but NOT going home, add 1 night at delivery
+  // (you'll be at the delivery location overnight before your next move)
+  // If going home, HOS calc already covers overnights for the full round trip
   const hasCurLoc = (document.getElementById('curloc').value || '').trim().length > 0;
-  if (hasCurLoc) nights += 1;
+  if (hasCurLoc && !getHome) nights += 1;
   const days        = Math.max(1, nights + 1);
   // Fuel & wear cover ALL miles (paid + unpaid)
   const fuel        = (totalTripMiles / mpg) * diesel;
@@ -1233,7 +1235,7 @@ function detectLocation() {
         const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&addressdetails=1', { headers: {'Accept-Language':'en'} });
         const d = await r.json();
         const a = d.address || {};
-        const city = a.city || a.town || a.village || a.hamlet || '';
+        const city = a.city || a.town || a.village || a.hamlet || a.municipality || a.county || '';
         const state = a.state || '';
         const loc = city + (city && state ? ', ' : '') + state;
         if (loc) {
