@@ -215,6 +215,22 @@
       position:absolute; bottom:0; left:14px; right:14px; height:1px;
       background:var(--yellow); opacity:0; transition:opacity .2s;
     }
+    /* Autocomplete dropdown */
+    .ac-list {
+      position:absolute; top:100%; left:0; right:0; z-index:50;
+      background:var(--surface); border:1px solid var(--border2);
+      border-top:none; border-radius:0 0 8px 8px;
+      max-height:180px; overflow-y:auto; display:none;
+      box-shadow:0 8px 24px rgba(0,0,0,.4);
+    }
+    .ac-list.show { display:block; }
+    .ac-item {
+      padding:10px 14px; font-size:14px; color:var(--white);
+      cursor:pointer; border-bottom:1px solid var(--border);
+    }
+    .ac-item:last-child { border-bottom:none; }
+    .ac-item:hover, .ac-item.active { background:var(--yellow2); color:var(--yellow); }
+    .ac-item .ac-sub { font-size:11px; color:var(--dim); margin-top:2px; }
     .route-arrow {
       display:flex; align-items:center; justify-content:center;
       width:32px; color:var(--dim); font-size:14px;
@@ -532,12 +548,14 @@
           <span class="inp-label">From</span>
           <input class="inp" id="origin" placeholder="Dallas, TX" autocomplete="off">
           <div class="focus-line"></div>
+          <div class="ac-list" id="ac-origin"></div>
         </div>
         <div class="route-arrow">→</div>
         <div class="inp-wrap">
           <span class="inp-label">To</span>
           <input class="inp" id="dest" placeholder="Nashville, TN" autocomplete="off">
           <div class="focus-line"></div>
+          <div class="ac-list" id="ac-dest"></div>
         </div>
       </div>
       <div class="route-divider"></div>
@@ -1219,6 +1237,80 @@ function updateEyebrow() {
     pill.innerHTML = '✓ Pro — Unlimited Calculations';
   }
 }
+
+// ── City autocomplete ──
+(function() {
+  let acTimer = null;
+  let activeIdx = -1;
+
+  function setupAC(inputId, listId) {
+    const inp = document.getElementById(inputId);
+    const list = document.getElementById(listId);
+    if (!inp || !list) return;
+
+    inp.addEventListener('input', function() {
+      clearTimeout(acTimer);
+      const q = this.value.trim();
+      if (q.length < 3) { list.classList.remove('show'); return; }
+      acTimer = setTimeout(() => fetchSuggestions(q, list, inp), 300);
+    });
+
+    inp.addEventListener('keydown', function(e) {
+      const items = list.querySelectorAll('.ac-item');
+      if (!items.length || !list.classList.contains('show')) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, items.length - 1); highlightItem(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlightItem(items); }
+      else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); e.stopPropagation(); items[activeIdx].click(); }
+      else if (e.key === 'Escape') { list.classList.remove('show'); }
+    });
+
+    inp.addEventListener('blur', function() {
+      setTimeout(() => list.classList.remove('show'), 200);
+    });
+  }
+
+  function highlightItem(items) {
+    items.forEach((it, i) => it.classList.toggle('active', i === activeIdx));
+  }
+
+  async function fetchSuggestions(query, list, inp) {
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query + ', USA') + '&format=json&limit=5&addressdetails=1', { headers: {'Accept-Language':'en'} });
+      const results = await r.json();
+      if (!results.length) { list.classList.remove('show'); return; }
+
+      const seen = new Set();
+      list.innerHTML = '';
+      activeIdx = -1;
+      results.forEach(function(r) {
+        const a = r.address || {};
+        const city = a.city || a.town || a.village || a.hamlet || a.municipality || '';
+        const state = a.state || '';
+        if (!city) return;
+        const label = city + ', ' + state;
+        if (seen.has(label)) return;
+        seen.add(label);
+        const div = document.createElement('div');
+        div.className = 'ac-item';
+        div.textContent = label;
+        div.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          inp.value = label;
+          list.classList.remove('show');
+          // Auto-focus next field
+          if (inp.id === 'origin') document.getElementById('dest').focus();
+          else if (inp.id === 'dest') document.getElementById('rate').focus();
+        });
+        list.appendChild(div);
+      });
+      if (list.children.length) list.classList.add('show');
+      else list.classList.remove('show');
+    } catch(e) { list.classList.remove('show'); }
+  }
+
+  setupAC('origin', 'ac-origin');
+  setupAC('dest', 'ac-dest');
+})();
 
 function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
 
