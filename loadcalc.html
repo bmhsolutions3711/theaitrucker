@@ -1124,7 +1124,7 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   const speed   = parseFloat(document.getElementById('avgspeed').value) || 70;
   const mpg     = MPG[loadType];
 
-  const HOS_LIMIT   = 11;
+  const HOS_LIMIT   = 10;  // realistic daily drive hours (legal max 11, but buffer for traffic)
   const LOADING_HRS = 2 * numStops;
   const getHome     = document.getElementById('gethome').checked;
   // Total trip includes deadhead + load + return
