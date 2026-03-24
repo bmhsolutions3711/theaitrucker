@@ -602,6 +602,8 @@
     </div>
   </div>
 
+  <button class="calc-btn" onclick="appMode==='single'?calculate():calculateMulti()">Calculate This Load</button>
+
   <!-- Load profile -->
   <div class="label">Load Profile</div>
   <div class="card">
@@ -673,8 +675,6 @@
       </div>
     </div>
   </div>
-
-  <button class="calc-btn" onclick="appMode==='single'?calculate():calculateMulti()">Calculate This Load</button>
   <button class="restore-link" id="restoreLink" onclick="openRestore()">Already paid? Restore access →</button>
 
   <!-- Results -->
