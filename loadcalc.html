@@ -640,7 +640,7 @@
       <div class="s-field" style="grid-column:1/-1;margin-bottom:4px">
         <div class="s-label">📍 Current Location</div>
         <div style="display:flex;gap:8px;align-items:center">
-          <input class="s-inp" id="curloc" type="text" placeholder="e.g. North Canton OH" style="flex:1">
+          <input class="s-inp" id="curloc" type="text" placeholder="e.g. North Canton OH" style="flex:1" oninput="gpsCoords=null">
           <button id="gpsBtn" onclick="detectLocation()" style="background:var(--yellow);color:#000;border:none;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;white-space:nowrap;font-weight:600" title="Use my location">📍 GPS</button>
         </div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--mid);cursor:pointer">
@@ -1002,8 +1002,11 @@ function parseVoice(text) {
 }
 
 function capCity(s) {
-  return s.replace(/\b\w/g, c => c.toUpperCase())
+  var result = s.replace(/\b\w/g, c => c.toUpperCase())
     .replace(/\b(Tx|Tn|Oh|Ga|Fl|Ca|Ny|Il|Pa|Nc|Va|Az|Co|Wa|Or|Mo|Sc|Al|La|Ms|Ar|Ky|Wv|Md|De|Ct|Nj|Ma|Mn|Wi|Mi|Ia|In|Nd|Sd|Ne|Ks|Ok|Nm|Id|Mt|Wy|Nv|Ut)\b/g, m => m.toUpperCase());
+  // Add comma before state abbreviation if missing (e.g. "Dallas TX" → "Dallas, TX")
+  result = result.replace(/\s+(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)$/i, ', $1');
+  return result;
 }
 
 // ── Geocode + Route (with localStorage cache) ──
@@ -1080,7 +1083,8 @@ async function calculate() {
     const getHome = document.getElementById('gethome').checked;
     if (curloc) {
       setStatus('Calculating deadhead…');
-      const cc = await geocode(curloc);
+      // Use raw GPS coords if available, otherwise geocode the text
+      const cc = gpsCoords ? [gpsCoords[0], gpsCoords[1]] : await geocode(curloc);
       if (cc) {
         const [dh, ret] = await Promise.all([
           routeMiles(cc, fc),
@@ -1144,7 +1148,7 @@ async function calculateMulti() {
     const getHome = document.getElementById('gethome').checked;
     if (curloc) {
       setStatus('Calculating deadhead…');
-      const cc = await geocode(curloc);
+      const cc = gpsCoords ? [gpsCoords[0], gpsCoords[1]] : await geocode(curloc);
       if (cc) {
         const [dh, ret] = await Promise.all([
           routeMiles(cc, firstPickupCoords),
@@ -1421,6 +1425,7 @@ async function checkRouteWeather(fromCoords, toCoords) {
 }
 
 // ── GPS location detection ──
+var gpsCoords = null; // Store raw GPS coords to avoid re-geocoding ambiguous names
 function detectLocation() {
   if (!navigator.geolocation) { setStatus('GPS not supported in this browser'); return; }
   const btn = document.getElementById('gpsBtn');
@@ -1430,6 +1435,7 @@ function detectLocation() {
     async function(pos) {
       try {
         const lat = pos.coords.latitude, lon = pos.coords.longitude;
+        gpsCoords = [lat, lon]; // Save raw coords
         const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&addressdetails=1', { headers: {'Accept-Language':'en'} });
         const d = await r.json();
         const a = d.address || {};
