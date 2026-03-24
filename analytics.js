@@ -5,7 +5,7 @@
 */
 (function() {
   // ⚠️ Replace this URL after deploying the Google Apps Script
-  var ENDPOINT = 'https://script.google.com/macros/s/AKfycbxjbyLvSTQ380Ix_JRuM8OhdryPwN5g8lxuAnUttZKvf2xQkpS8K289gdAV-5kIHqHB/exec';
+  var ENDPOINT = 'https://script.google.com/macros/s/AKfycbzXLB-B5Wu6IpnEVoTuetxu6jelaOem61TgSOIhc7uV1iVMZtxku5XTxf2Up68JIHQU/exec';
 
   // Persistent anonymous user ID (survives between visits, no PII)
   var uid = localStorage.getItem('lc_uid');
