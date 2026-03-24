@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>LoadCalc — The AI Trucker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Barlow+Condensed:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -594,7 +596,7 @@
   <div class="voice-section">
     <button class="voice-circle" id="voiceBtn" onclick="startVoice()">🎤</button>
     <p class="voice-hint" id="voiceHint">Say <strong>"Dallas TX to Nashville TN rate 850"</strong></p>
-    <div id="voiceFallback" style="display:none;margin-top:10px;display:none">
+    <div id="voiceFallback" style="display:none;margin-top:10px">
       <input class="inp" id="voiceText" placeholder='Type: "Dallas TX to Nashville TN rate 850"' style="font-size:13px">
       <button onclick="parseVoice(document.getElementById('voiceText').value);document.getElementById('voiceText').value=''" style="margin-top:6px;width:100%;padding:9px;background:var(--yellow);border:none;border-radius:var(--r);color:#000;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;cursor:pointer">PARSE</button>
     </div>
@@ -765,7 +767,6 @@
   </div>
 </div>
 
-<script src="https://js.stripe.com/v3/"></script>
 <script>
 // ── Config ──
 const MPG_HOTSHOT  = {under:15, over:11, heavy:9};
@@ -1008,12 +1009,12 @@ function capCity(s) {
 // ── Geocode + Route (with localStorage cache) ──
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-function cacheGet(key) {
+function cacheGet(key, ttl) {
   try {
     const raw = localStorage.getItem('lc_cache_' + key);
     if (!raw) return null;
     const { val, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem('lc_cache_' + key); return null; }
+    if (Date.now() - ts > (ttl || CACHE_TTL)) { localStorage.removeItem('lc_cache_' + key); return null; }
     return val;
   } catch(e) { return null; }
 }
@@ -1026,11 +1027,17 @@ async function geocode(city) {
   const cached = cacheGet(key);
   if (cached) return cached;
   try {
-    const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(city + ', USA') + '&format=json&limit=1', {headers:{'Accept-Language':'en','User-Agent':'LoadCalc/1.0'}});
+    const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(city + ', USA') + '&format=json&limit=5&addressdetails=1', {headers:{'Accept-Language':'en','User-Agent':'LoadCalc/1.0'}});
     if (r.status === 429) { setStatus('⚠️ Too many requests — try again in a moment'); return null; }
     const d = await r.json();
-    const result = d[0] ? {lat:d[0].lat, lon:d[0].lon} : null;
-    if (result) cacheSet(key, result);
+    if (!d.length) return null;
+    // Prefer actual places over counties — filter out county-level results
+    // when a more specific match exists at the same name
+    const isCounty = r => (r.display_name || '').toLowerCase().includes('county') && r.type === 'administrative';
+    const nonCounty = d.filter(r => !isCounty(r));
+    const best = nonCounty.length > 0 ? nonCounty[0] : d[0];
+    const result = {lat: best.lat, lon: best.lon};
+    cacheSet(key, result);
     return result;
   } catch(e) { return null; }
 }
@@ -1068,15 +1075,19 @@ async function calculate() {
     const miles = await routeMiles(fc, tc);
     if (!miles) { setStatus('Could not calculate route'); return; }
 
-    // Deadhead + return if current location is set
+    // Deadhead + return if current location is set (parallel)
     let deadheadMiles = 0, returnMiles = 0;
     const getHome = document.getElementById('gethome').checked;
     if (curloc) {
       setStatus('Calculating deadhead…');
       const cc = await geocode(curloc);
       if (cc) {
-        deadheadMiles = (await routeMiles(cc, fc)) || 0;
-        if (getHome) returnMiles = (await routeMiles(tc, cc)) || 0;
+        const [dh, ret] = await Promise.all([
+          routeMiles(cc, fc),
+          getHome ? routeMiles(tc, cc) : Promise.resolve(0)
+        ]);
+        deadheadMiles = dh || 0;
+        returnMiles = ret || 0;
       }
     }
 
@@ -1102,33 +1113,45 @@ async function calculateMulti() {
   setStatus('Calculating multi-stop route…');
   document.getElementById('results').classList.remove('show');
   try {
+    // Geocode all origins + destinations in parallel
+    setStatus('Looking up locations…');
+    const allCities = valid.flatMap(s => [s.origin, s.dest]);
+    const geoResults = await Promise.all(allCities.map(c => geocode(c)));
+    for (let i = 0; i < geoResults.length; i++) {
+      if (!geoResults[i]) { setStatus('Could not find: ' + allCities[i]); return; }
+    }
+
+    // Route all legs in parallel
+    setStatus('Calculating routes…');
+    const routeResults = await Promise.all(
+      valid.map((s, i) => routeMiles(geoResults[i * 2], geoResults[i * 2 + 1]))
+    );
+
     let totalMiles = 0, totalRate = 0;
     const legs = [];
     for (let i = 0; i < valid.length; i++) {
-      const s = valid[i];
-      setStatus('Route ' + (i+1) + ' of ' + valid.length + '…');
-      const [fc, tc] = await Promise.all([geocode(s.origin), geocode(s.dest)]);
-      if (!fc) { setStatus('Could not find: ' + s.origin); return; }
-      if (!tc) { setStatus('Could not find: ' + s.dest);   return; }
-      const miles = await routeMiles(fc, tc);
-      if (!miles) { setStatus('Could not route stop ' + (i+1)); return; }
-      totalMiles += miles; totalRate += s.rate;
-      legs.push({label: s.origin + ' → ' + s.dest, miles, rate: s.rate});
+      if (!routeResults[i]) { setStatus('Could not route stop ' + (i + 1)); return; }
+      totalMiles += routeResults[i]; totalRate += valid[i].rate;
+      legs.push({label: valid[i].origin + ' → ' + valid[i].dest, miles: routeResults[i], rate: valid[i].rate});
     }
 
-    // Deadhead + return if current location is set
+    // Reuse first pickup and last drop coords (already geocoded above)
+    const firstPickupCoords = geoResults[0];
+    const lastDropCoords = geoResults[geoResults.length - 1];
+
+    // Deadhead + return if current location is set (parallel)
     let deadheadMiles = 0, returnMiles = 0;
     const getHome = document.getElementById('gethome').checked;
     if (curloc) {
       setStatus('Calculating deadhead…');
       const cc = await geocode(curloc);
       if (cc) {
-        const firstPickup = await geocode(valid[0].origin);
-        if (firstPickup) deadheadMiles = (await routeMiles(cc, firstPickup)) || 0;
-        if (getHome) {
-          const lastDrop = await geocode(valid[valid.length - 1].dest);
-          if (lastDrop) returnMiles = (await routeMiles(lastDrop, cc)) || 0;
-        }
+        const [dh, ret] = await Promise.all([
+          routeMiles(cc, firstPickupCoords),
+          getHome ? routeMiles(lastDropCoords, cc) : Promise.resolve(0)
+        ]);
+        deadheadMiles = dh || 0;
+        returnMiles = ret || 0;
       }
     }
 
@@ -1145,38 +1168,45 @@ async function calculateMulti() {
 
     showResults(totalMiles, totalRate, valid.length, deadheadMiles, returnMiles);
     setStatus('');
-    // Weather check: first pickup → last delivery
-    const wxFrom = await geocode(valid[0].origin);
-    const wxTo = await geocode(valid[valid.length - 1].dest);
-    if (wxFrom && wxTo) checkRouteWeather(wxFrom, wxTo);
+    // Weather check: reuse already-geocoded first pickup and last drop
+    if (firstPickupCoords && lastDropCoords) checkRouteWeather(firstPickupCoords, lastDropCoords);
     if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
   } catch(e) { setStatus('⚠️ Check city names and try again'); }
 }
 
+// ── Cached DOM refs (queried once, reused every calculation) ──
+const $  = id => document.getElementById(id);
+const DOM = {};
+function initDOM() {
+  ['diesel','wear','perdiem','tolls','lodging','avgspeed','gethome','curloc',
+   'resMiles','resGross','resNet','resGallons','results',
+   'bkDeadheadRow','bkDeadhead','bkFuel','bkFood','bkLodging','bkTolls','bkWear','bkTotal',
+   'verdict','verdictNum','verdictLabel','verdictSub'
+  ].forEach(id => { DOM[id] = $(id); });
+}
+
 // ── Show results ──
 function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
+  if (!DOM.diesel) initDOM();
   deadheadMiles = deadheadMiles || 0;
   returnMiles = returnMiles || 0;
-  const diesel  = parseFloat(document.getElementById('diesel').value)   || 5;
-  const wearCPM = parseFloat(document.getElementById('wear').value)     || 15;
-  const perdiem = parseFloat(document.getElementById('perdiem').value)  || 35;
-  const tolls   = parseFloat(document.getElementById('tolls').value)    || 0;
-  const lodgN   = parseFloat(document.getElementById('lodging').value)  || 75;
-  const speed   = parseFloat(document.getElementById('avgspeed').value) || 70;
+  const diesel  = parseFloat(DOM.diesel.value)   || 5;
+  const wearCPM = parseFloat(DOM.wear.value)     || 15;
+  const perdiem = parseFloat(DOM.perdiem.value)  || 35;
+  const tolls   = parseFloat(DOM.tolls.value)    || 0;
+  const lodgN   = parseFloat(DOM.lodging.value)  || 75;
+  const speed   = parseFloat(DOM.avgspeed.value) || 70;
   const mpg     = MPG[loadType];
 
-  const HOS_LIMIT   = 10;  // realistic daily drive hours (legal max 11, but buffer for traffic)
-  const getHome     = document.getElementById('gethome').checked;
-  // Total trip: only driving miles (loading time is minimal for single loads)
+  const HOS_LIMIT   = 10;
+  const getHome     = DOM.gethome.checked;
   const unpaidMiles = deadheadMiles + returnMiles;
   const totalTripMiles = miles + unpaidMiles;
   const driveHours  = totalTripMiles / speed;
   const nights      = Math.max(0, Math.ceil(driveHours / HOS_LIMIT) - 1);
-  // If current location is set but NOT going home, add 1 night at delivery
-  const hasCurLoc = (document.getElementById('curloc').value || '').trim().length > 0;
+  const hasCurLoc = (DOM.curloc.value || '').trim().length > 0;
   const totalNights = (hasCurLoc && !getHome) ? nights + 1 : nights;
   const days        = totalNights + 1;
-  // Fuel & wear cover ALL miles (paid + unpaid)
   const fuel        = (totalTripMiles / mpg) * diesel;
   const wear        = totalTripMiles * (wearCPM / 100);
   const lodging     = totalNights * lodgN;
@@ -1184,57 +1214,51 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   const tollsTotal  = tolls * numStops;
   const total       = fuel + perdiemTotal + tollsTotal + wear + lodging;
   const net         = rate - total;
-  const rpm         = rate / miles; // RPM based on paid miles only
+  const rpm         = rate / miles;
 
   // Deadhead row
-  const dhRow = document.getElementById('bkDeadheadRow');
   if (unpaidMiles > 0) {
     const dhFuel = (unpaidMiles / mpg) * diesel;
-    dhRow.style.display = '';
-    document.getElementById('bkDeadhead').textContent = unpaidMiles.toLocaleString() + ' mi · $' + dhFuel.toFixed(2) + ' fuel';
+    DOM.bkDeadheadRow.style.display = '';
+    DOM.bkDeadhead.textContent = unpaidMiles.toLocaleString() + ' mi · $' + dhFuel.toFixed(2) + ' fuel';
   } else {
-    dhRow.style.display = 'none';
+    DOM.bkDeadheadRow.style.display = 'none';
   }
 
-  document.getElementById('resMiles').textContent   = miles.toLocaleString();
-  document.getElementById('resGross').textContent   = '$' + rate.toLocaleString();
-  document.getElementById('resNet').textContent     = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString();
-  document.getElementById('resGallons').textContent = Math.round(totalTripMiles / mpg);
-  document.getElementById('bkFuel').textContent     = '$' + fuel.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
-  document.getElementById('bkFood').textContent     = '$' + perdiemTotal.toFixed(2) + ' (' + days + ' day' + (days > 1 ? 's' : '') + ')';
-  document.getElementById('bkLodging').textContent  = totalNights > 0 ? '$' + lodging.toFixed(2) + ' (' + totalNights + ' night' + (totalNights > 1 ? 's' : '') + ')' : '$0';
-  document.getElementById('bkTolls').textContent    = '$' + tollsTotal.toFixed(2);
-  document.getElementById('bkWear').textContent     = '$' + wear.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
-  document.getElementById('bkTotal').textContent    = '$' + total.toFixed(2);
+  DOM.resMiles.textContent   = miles.toLocaleString();
+  DOM.resGross.textContent   = '$' + rate.toLocaleString();
+  DOM.resNet.textContent     = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString();
+  DOM.resGallons.textContent = Math.round(totalTripMiles / mpg);
+  DOM.bkFuel.textContent     = '$' + fuel.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
+  DOM.bkFood.textContent     = '$' + perdiemTotal.toFixed(2) + ' (' + days + ' day' + (days > 1 ? 's' : '') + ')';
+  DOM.bkLodging.textContent  = totalNights > 0 ? '$' + lodging.toFixed(2) + ' (' + totalNights + ' night' + (totalNights > 1 ? 's' : '') + ')' : '$0';
+  DOM.bkTolls.textContent    = '$' + tollsTotal.toFixed(2);
+  DOM.bkWear.textContent     = '$' + wear.toFixed(2) + (unpaidMiles > 0 ? ' (' + totalTripMiles.toLocaleString() + ' total mi)' : '');
+  DOM.bkTotal.textContent    = '$' + total.toFixed(2);
 
-  const v  = document.getElementById('verdict');
-  const vn = document.getElementById('verdictNum');
-  const vl = document.getElementById('verdictLabel');
-  const vs = document.getElementById('verdictSub');
-  vn.textContent = '$' + rpm.toFixed(2) + '/mi';
+  DOM.verdictNum.textContent = '$' + rpm.toFixed(2) + '/mi';
   const dailyNet = net / days;
   const dhNote = unpaidMiles > 0 ? ' · ' + unpaidMiles.toLocaleString() + ' deadhead' : '';
   const dayInfo = days + ' day' + (days > 1 ? 's' : '');
   if (net < 0) {
-    v.className = 'verdict no';
-    vl.textContent = '🔴 Don\'t Take It — Loses Money';
-    vs.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' below break-even · ' + dayInfo + dhNote;
+    DOM.verdict.className = 'verdict no';
+    DOM.verdictLabel.textContent = '🔴 Don\'t Take It — Loses Money';
+    DOM.verdictSub.textContent = '$' + Math.round(Math.abs(net)).toLocaleString() + ' below break-even · ' + dayInfo + dhNote;
   } else if (dailyNet < 300) {
-    v.className = 'verdict maybe';
-    vl.textContent = '🟡 Consider — Low Profit';
-    vs.textContent = '$' + Math.round(dailyNet).toLocaleString() + '/day · $' + Math.round(net).toLocaleString() + ' net · ' + dayInfo + dhNote;
+    DOM.verdict.className = 'verdict maybe';
+    DOM.verdictLabel.textContent = '🟡 Consider — Low Profit';
+    DOM.verdictSub.textContent = '$' + Math.round(dailyNet).toLocaleString() + '/day · $' + Math.round(net).toLocaleString() + ' net · ' + dayInfo + dhNote;
   } else {
-    v.className = 'verdict go';
-    vl.textContent = '✅ Take It';
-    vs.textContent = '$' + Math.round(dailyNet).toLocaleString() + '/day · $' + Math.round(net).toLocaleString() + ' net · ' + dayInfo + dhNote;
+    DOM.verdict.className = 'verdict go';
+    DOM.verdictLabel.textContent = '✅ Take It';
+    DOM.verdictSub.textContent = '$' + Math.round(dailyNet).toLocaleString() + '/day · $' + Math.round(net).toLocaleString() + ' net · ' + dayInfo + dhNote;
   }
 
   // Cascade in
-  const results = document.getElementById('results');
-  results.classList.remove('show');
-  void results.offsetHeight;
-  results.classList.add('show');
-  results.scrollIntoView({behavior:'smooth', block:'nearest'});
+  DOM.results.classList.remove('show');
+  void DOM.results.offsetHeight;
+  DOM.results.classList.add('show');
+  DOM.results.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 function resetCalc() {
@@ -1332,13 +1356,25 @@ function updateEyebrow() {
 
 function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
 
-// ── Route weather check ──
-const OWM_KEY = '2100c08faa7729bbd1d620c0f8b7d104';
+// ── Route weather check (via server-side proxy) ──
+const API_PROXY = 'https://script.google.com/macros/s/AKfycbypBXf9HXzcJzvhzZWmYkYhFrrwIKSe2HOAii2F7fXrN9641nqBxlBP4ffQ4iOALXar/exec';
 const WX_BAD = new Set([200,201,202,210,211,212,221,230,231,232, // thunderstorm
   502,503,504,511,       // heavy/freezing rain
   600,601,602,611,612,613,615,616,620,621,622, // snow
   711,731,751,761,762,771,781 // smoke, dust, tornado
 ]);
+
+const WX_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+async function fetchWeather(lat, lon) {
+  const cacheKey = 'wx_' + Math.round(lat*100) + '_' + Math.round(lon*100);
+  const cached = cacheGet(cacheKey, WX_CACHE_TTL);
+  if (cached) return cached;
+  const r = await fetch(API_PROXY + '?action=weather&lat=' + lat + '&lon=' + lon);
+  const d = await r.json();
+  const result = { weather: d.weather?.[0] || {}, main: d.main || {}, name: d.name || '' };
+  cacheSet(cacheKey, result);
+  return result;
+}
 
 async function checkRouteWeather(fromCoords, toCoords) {
   const banner = document.getElementById('wxBanner');
@@ -1352,9 +1388,7 @@ async function checkRouteWeather(fromCoords, toCoords) {
       { label: 'Delivery', lat: toCoords.lat, lon: toCoords.lon }
     ];
     const results = await Promise.all(points.map(p =>
-      fetch('https://api.openweathermap.org/data/2.5/weather?lat=' + p.lat + '&lon=' + p.lon + '&appid=' + OWM_KEY + '&units=imperial')
-        .then(r => r.json())
-        .then(d => ({ label: p.label, weather: d.weather?.[0] || {}, main: d.main || {}, name: d.name || '' }))
+      fetchWeather(p.lat, p.lon).then(d => ({ label: p.label, ...d }))
     ));
 
     const warnings = [];
@@ -1435,9 +1469,7 @@ function handlePayment() {
     : 'https://buy.stripe.com/fZu5kD1ulazx7cs6DLgQE00';
 }
 
-// ── Restore access ──
-const PRO_EMAILS_BIN = 'https://api.jsonbin.io/v3/b/69af7d2043b1c97be9c74547';
-const PRO_BIN_KEY    = '$2a$10$ULYp1072ddh26aXQdI9V6.R1eRDeMnw8J.b5MrD3Bkfof1wpKzeRq';
+// ── Restore access (via server-side proxy — no API keys exposed) ──
 
 function openRestore() {
   document.getElementById('restoreModal').classList.add('show');
@@ -1449,6 +1481,10 @@ function closeRestore() { document.getElementById('restoreModal').classList.remo
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('restoreModal').addEventListener('click', function(e) {
     if (e.target === this) closeRestore();
+  });
+  // Select all text on focus for quick replacement
+  ['curloc','origin','dest','rate'].forEach(id => {
+    document.getElementById(id).addEventListener('focus', function() { this.select(); });
   });
 });
 
@@ -1464,10 +1500,9 @@ async function verifyRestore() {
   document.getElementById('restoreMsg').style.color = 'var(--mid)';
   document.getElementById('restoreMsg').textContent = 'Looking up your purchase...';
   try {
-    const r = await fetch(PRO_EMAILS_BIN, { headers: { 'X-Master-Key': PRO_BIN_KEY } });
+    const r = await fetch(API_PROXY + '?action=pro_check&email=' + encodeURIComponent(email));
     const j = await r.json();
-    const proEmails = (j.record && j.record.pro_emails) ? j.record.pro_emails.map(e => e.toLowerCase()) : [];
-    if (proEmails.includes(email)) {
+    if (j.isPro) {
       localStorage.setItem('lc_pro', '1');
       localStorage.setItem('lc_pro_email', email);
       isPro = true;
@@ -1503,17 +1538,10 @@ function updateRestoreLink() {
 async function registerProEmail(email) {
   if (!email) return;
   try {
-    const r = await fetch(PRO_EMAILS_BIN, { headers: { 'X-Master-Key': PRO_BIN_KEY } });
-    const j = await r.json();
-    const emails = (j.record && j.record.pro_emails) ? j.record.pro_emails : [];
-    if (!emails.map(e=>e.toLowerCase()).includes(email.toLowerCase())) {
-      emails.push(email.toLowerCase());
-      await fetch(PRO_EMAILS_BIN, {
-        method: 'PUT',
-        headers: { 'X-Master-Key': PRO_BIN_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...j.record, pro_emails: emails })
-      });
-    }
+    await fetch(API_PROXY, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'pro_register', email: email })
+    });
   } catch(e) { console.warn('Could not register pro email', e); }
 }
 
@@ -1547,7 +1575,7 @@ function closeSuccessOverlay() {
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
   localStorage.setItem('lc_theme', isLight ? 'light' : 'dark');
-  document.getElementById('themeToggle').innerHTML = isLight ? '🌑 Dark' : '🌙 Dark';
+  document.getElementById('themeToggle').innerHTML = isLight ? '🌑 Dark' : '☀️ Light';
 }
 (function() {
   if (localStorage.getItem('lc_theme') === 'light') {
