@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Barlow+Condensed:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
       --bg:      #090909;
@@ -234,6 +236,9 @@
     .ac-item:hover, .ac-item.active { background:var(--yellow2); color:var(--yellow); }
     .ac-item .ac-sub { font-size:11px; color:var(--dim); margin-top:2px; }
     /* Weather warning banner */
+    #routeMap { width:100%; height:280px; border-radius:12px; border:1px solid var(--border2); margin-bottom:12px; display:none; z-index:1; }
+    .light #routeMap { border-color:#d0d5dd; }
+    .leaflet-control-attribution { font-size:9px !important; opacity:0.5; }
     .wx-banner {
       display:none; margin:12px 0; padding:14px 18px;
       border-radius:var(--r); font-size:13px; line-height:1.5;
@@ -701,6 +706,7 @@
       <div class="bk-row"><span class="bk-label">🔧 Wear &amp; Tear</span><span class="bk-val" id="bkWear">—</span></div>
       <div class="bk-row bk-total"><span class="bk-label">Total Expenses</span><span class="bk-val" id="bkTotal">—</span></div>
     </div>
+    <div id="routeMap"></div>
     <div class="wx-banner" id="wxBanner">
       <div class="wx-title" id="wxTitle"></div>
       <div class="wx-detail" id="wxDetail"></div>
@@ -1051,12 +1057,15 @@ async function routeMiles(fc, tc) {
   const cached = cacheGet(key);
   if (cached) return cached;
   try {
-    const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + fc.lon+','+fc.lat+';'+tc.lon+','+tc.lat+'?overview=false');
+    const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + fc.lon+','+fc.lat+';'+tc.lon+','+tc.lat+'?overview=full&geometries=geojson');
     if (r.status === 429 || r.status === 503) { setStatus('⚠️ Route service busy — try again in a moment'); return null; }
     const d = await r.json();
-    const miles = d.routes?.[0] ? Math.round(d.routes[0].distance * 0.000621371) : null;
-    if (miles) cacheSet(key, miles);
-    return miles;
+    const route = d.routes?.[0];
+    if (!route) return null;
+    const miles = Math.round(route.distance * 0.000621371);
+    const result = { miles, geometry: route.geometry || null };
+    cacheSet(key, result);
+    return result;
   } catch(e) { return null; }
 }
 
@@ -1076,23 +1085,28 @@ async function calculate() {
     if (!fc) { setStatus('Could not find: ' + origin); return; }
     if (!tc) { setStatus('Could not find: ' + dest);   return; }
     setStatus('Calculating…');
-    const miles = await routeMiles(fc, tc);
-    if (!miles) { setStatus('Could not calculate route'); return; }
+    const routeData = await routeMiles(fc, tc);
+    if (!routeData) { setStatus('Could not calculate route'); return; }
+    const miles = routeData.miles;
+    const routeGeometry = routeData.geometry;
 
     // Deadhead + return if current location is set (parallel)
     let deadheadMiles = 0, returnMiles = 0;
+    let dhGeometry = null, retGeometry = null;
     const getHome = document.getElementById('gethome').checked;
+    let cc = null;
     if (curloc) {
       setStatus('Calculating deadhead…');
-      // Use raw GPS coords if available, otherwise geocode the text
-      const cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
+      cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
       if (cc) {
-        const [dh, ret] = await Promise.all([
+        const [dhData, retData] = await Promise.all([
           routeMiles(cc, fc),
-          getHome ? routeMiles(tc, cc) : Promise.resolve(0)
+          getHome ? routeMiles(tc, cc) : Promise.resolve(null)
         ]);
-        deadheadMiles = dh || 0;
-        returnMiles = ret || 0;
+        deadheadMiles = dhData ? dhData.miles : 0;
+        dhGeometry = dhData ? dhData.geometry : null;
+        returnMiles = retData ? retData.miles : 0;
+        retGeometry = retData ? retData.geometry : null;
       }
     }
 
@@ -1103,6 +1117,7 @@ async function calculate() {
     localStorage.setItem('lc_last_dest', dest);
     localStorage.setItem('lc_last_rate', rate);
     showResults(miles, rate, 1, deadheadMiles, returnMiles);
+    renderRouteMap({ fc, tc, cc, routeGeometry, dhGeometry, retGeometry });
     setStatus('');
     checkRouteWeather(fc, tc);
     if (!isPro && calcCount >= FREE_LIMIT) setTimeout(showPaywall, 2000);
@@ -1134,10 +1149,12 @@ async function calculateMulti() {
 
     let totalMiles = 0, totalRate = 0;
     const legs = [];
+    const allGeometries = [];
     for (let i = 0; i < valid.length; i++) {
       if (!routeResults[i]) { setStatus('Could not route stop ' + (i + 1)); return; }
-      totalMiles += routeResults[i]; totalRate += valid[i].rate;
-      legs.push({label: valid[i].origin + ' → ' + valid[i].dest, miles: routeResults[i], rate: valid[i].rate});
+      totalMiles += routeResults[i].miles; totalRate += valid[i].rate;
+      legs.push({label: valid[i].origin + ' → ' + valid[i].dest, miles: routeResults[i].miles, rate: valid[i].rate});
+      if (routeResults[i].geometry) allGeometries.push(routeResults[i].geometry);
     }
 
     // Reuse first pickup and last drop coords (already geocoded above)
@@ -1146,17 +1163,21 @@ async function calculateMulti() {
 
     // Deadhead + return if current location is set (parallel)
     let deadheadMiles = 0, returnMiles = 0;
+    let dhGeometry = null, retGeometry = null;
     const getHome = document.getElementById('gethome').checked;
+    let cc = null;
     if (curloc) {
       setStatus('Calculating deadhead…');
-      const cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
+      cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
       if (cc) {
-        const [dh, ret] = await Promise.all([
+        const [dhData, retData] = await Promise.all([
           routeMiles(cc, firstPickupCoords),
-          getHome ? routeMiles(lastDropCoords, cc) : Promise.resolve(0)
+          getHome ? routeMiles(lastDropCoords, cc) : Promise.resolve(null)
         ]);
-        deadheadMiles = dh || 0;
-        returnMiles = ret || 0;
+        deadheadMiles = dhData ? dhData.miles : 0;
+        dhGeometry = dhData ? dhData.geometry : null;
+        returnMiles = retData ? retData.miles : 0;
+        retGeometry = retData ? retData.geometry : null;
       }
     }
 
@@ -1172,6 +1193,9 @@ async function calculateMulti() {
     document.getElementById('run-summary').style.display = '';
 
     showResults(totalMiles, totalRate, valid.length, deadheadMiles, returnMiles);
+    // Combine all geometries for multi-stop map
+    const combinedGeometry = allGeometries.length ? { type:'GeometryCollection', geometries: allGeometries } : null;
+    renderRouteMap({ fc: firstPickupCoords, tc: lastDropCoords, cc, routeGeometry: combinedGeometry, dhGeometry, retGeometry, allStops: geoResults });
     setStatus('');
     // Weather check: reuse already-geocoded first pickup and last drop
     if (firstPickupCoords && lastDropCoords) checkRouteWeather(firstPickupCoords, lastDropCoords);
@@ -1278,9 +1302,106 @@ function resetCalc() {
   document.getElementById('results').classList.remove('show');
   document.getElementById('run-summary').style.display = 'none';
   document.getElementById('wxBanner').classList.remove('show','warn','danger');
+  document.getElementById('routeMap').style.display = 'none';
+  if (window._routeMap) { window._routeMap.remove(); window._routeMap = null; }
   ['origin','dest','rate'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   setStatus('');
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── Route Map ──
+function renderRouteMap(opts) {
+  const { fc, tc, cc, routeGeometry, dhGeometry, retGeometry, allStops } = opts;
+  const mapEl = document.getElementById('routeMap');
+
+  // Clean up previous map
+  if (window._routeMap) { window._routeMap.remove(); window._routeMap = null; }
+
+  mapEl.style.display = 'block';
+
+  const isDark = !document.body.classList.contains('light');
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+  const map = L.map('routeMap', { zoomControl: true, attributionControl: true });
+  window._routeMap = map;
+
+  L.tileLayer(tileUrl, {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    maxZoom: 18
+  }).addTo(map);
+
+  const bounds = L.latLngBounds();
+
+  // Custom icon helper
+  function pin(color, label) {
+    return L.divIcon({
+      className: '',
+      html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+  }
+
+  // Current location marker (yellow)
+  if (cc) {
+    const ll = L.latLng(parseFloat(cc.lat), parseFloat(cc.lon));
+    L.marker(ll, { icon: pin('#FFD600'), title: 'Current Location' }).addTo(map);
+    bounds.extend(ll);
+  }
+
+  // Pickup marker (green)
+  const pickupLL = L.latLng(parseFloat(fc.lat), parseFloat(fc.lon));
+  L.marker(pickupLL, { icon: pin('#00E676'), title: 'Pickup' }).addTo(map);
+  bounds.extend(pickupLL);
+
+  // Delivery marker (red)
+  const deliveryLL = L.latLng(parseFloat(tc.lat), parseFloat(tc.lon));
+  L.marker(deliveryLL, { icon: pin('#ff4444'), title: 'Delivery' }).addTo(map);
+  bounds.extend(deliveryLL);
+
+  // Multi-stop intermediate markers (orange)
+  if (allStops && allStops.length > 2) {
+    for (let i = 1; i < allStops.length - 1; i++) {
+      const s = allStops[i];
+      const sll = L.latLng(parseFloat(s.lat), parseFloat(s.lon));
+      L.marker(sll, { icon: pin('#ff9800'), title: 'Stop ' + (i + 1) }).addTo(map);
+      bounds.extend(sll);
+    }
+  }
+
+  // Draw route geometry
+  function drawGeoJSON(geom, color, dash) {
+    if (!geom) return;
+    try {
+      const layer = L.geoJSON(geom, {
+        style: { color, weight: 4, opacity: 0.8, dashArray: dash || null }
+      });
+      layer.addTo(map);
+      bounds.extend(layer.getBounds());
+    } catch(e) { /* silent */ }
+  }
+
+  // Deadhead route (dashed yellow)
+  drawGeoJSON(dhGeometry, '#FFD600', '8 6');
+
+  // Main load route (solid blue)
+  if (routeGeometry) {
+    if (routeGeometry.type === 'GeometryCollection') {
+      routeGeometry.geometries.forEach(g => drawGeoJSON(g, '#4FC3F7', null));
+    } else {
+      drawGeoJSON(routeGeometry, '#4FC3F7', null);
+    }
+  }
+
+  // Return home route (dashed gray)
+  drawGeoJSON(retGeometry, '#888', '8 6');
+
+  // Fit bounds with padding
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
 }
 
 function updateEyebrow() {
@@ -1314,11 +1435,13 @@ function updateEyebrow() {
 
     inp.addEventListener('keydown', function(e) {
       const items = list.querySelectorAll('.ac-item');
-      if (!items.length || !list.classList.contains('show')) return;
+      const showing = list.classList.contains('show') && items.length > 0;
+      // Tab: select first suggestion if list is visible
+      if (e.key === 'Tab' && showing) { e.preventDefault(); items[activeIdx >= 0 ? activeIdx : 0].click(); return; }
+      if (!showing) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, items.length - 1); highlightItem(items); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlightItem(items); }
       else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); e.stopPropagation(); items[activeIdx].click(); }
-      else if (e.key === 'Tab' && list.classList.contains('show') && items.length) { e.preventDefault(); items[0].click(); }
       else if (e.key === 'Escape') { list.classList.remove('show'); }
     });
 
