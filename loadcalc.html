@@ -1084,7 +1084,7 @@ async function calculate() {
     if (curloc) {
       setStatus('Calculating deadhead…');
       // Use raw GPS coords if available, otherwise geocode the text
-      const cc = gpsCoords ? [gpsCoords[0], gpsCoords[1]] : await geocode(curloc);
+      const cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
       if (cc) {
         const [dh, ret] = await Promise.all([
           routeMiles(cc, fc),
@@ -1148,7 +1148,7 @@ async function calculateMulti() {
     const getHome = document.getElementById('gethome').checked;
     if (curloc) {
       setStatus('Calculating deadhead…');
-      const cc = gpsCoords ? [gpsCoords[0], gpsCoords[1]] : await geocode(curloc);
+      const cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
       if (cc) {
         const [dh, ret] = await Promise.all([
           routeMiles(cc, firstPickupCoords),
@@ -1439,9 +1439,11 @@ function detectLocation() {
         const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&addressdetails=1', { headers: {'Accept-Language':'en'} });
         const d = await r.json();
         const a = d.address || {};
-        const city = a.city || a.town || a.village || a.hamlet || a.municipality || a.county || '';
+        const city = a.city || a.town || a.village || a.hamlet || '';
+        // If only township/municipality (ambiguous), add county for clarity
+        const place = city || a.municipality || a.county || '';
         const state = a.state || '';
-        const loc = city + (city && state ? ', ' : '') + state;
+        const loc = place + (place && state ? ', ' : '') + state;
         if (loc) {
           document.getElementById('curloc').value = loc;
           saveSettings();
