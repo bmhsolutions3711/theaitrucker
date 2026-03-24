@@ -1055,7 +1055,8 @@ async function geocode(city) {
 async function routeMiles(fc, tc) {
   const key = 'route_' + fc.lat + '_' + fc.lon + '_' + tc.lat + '_' + tc.lon;
   const cached = cacheGet(key);
-  if (cached) return cached;
+  // Only use cached if it's the new object format (not old plain number)
+  if (cached && typeof cached === 'object' && cached.miles) return cached;
   try {
     const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + fc.lon+','+fc.lat+';'+tc.lon+','+tc.lat+'?overview=full&geometries=geojson');
     if (r.status === 429 || r.status === 503) { setStatus('⚠️ Route service busy — try again in a moment'); return null; }
