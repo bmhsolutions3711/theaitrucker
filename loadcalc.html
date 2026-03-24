@@ -693,6 +693,7 @@
     <div class="breakdown">
       <div class="bk-head">Expense Breakdown</div>
       <div class="bk-row" id="bkDeadheadRow" style="display:none"><span class="bk-label">📍 Deadhead</span><span class="bk-val" id="bkDeadhead">—</span></div>
+      <div class="bk-row" id="bkReturnRow" style="display:none"><span class="bk-label">🏠 Return Home</span><span class="bk-val" id="bkReturn">—</span></div>
       <div class="bk-row"><span class="bk-label">⛽ Fuel</span><span class="bk-val" id="bkFuel">—</span></div>
       <div class="bk-row"><span class="bk-label">🍔 Per Diem</span><span class="bk-val" id="bkFood">—</span></div>
       <div class="bk-row"><span class="bk-label">🅿️ Parking/Lodging</span><span class="bk-val" id="bkLodging">—</span></div>
@@ -1184,7 +1185,7 @@ const DOM = {};
 function initDOM() {
   ['diesel','wear','perdiem','tolls','lodging','avgspeed','gethome','curloc',
    'resMiles','resGross','resNet','resGallons','results',
-   'bkDeadheadRow','bkDeadhead','bkFuel','bkFood','bkLodging','bkTolls','bkWear','bkTotal',
+   'bkDeadheadRow','bkDeadhead','bkReturnRow','bkReturn','bkFuel','bkFood','bkLodging','bkTolls','bkWear','bkTotal',
    'verdict','verdictNum','verdictLabel','verdictSub'
   ].forEach(id => { DOM[id] = $(id); });
 }
@@ -1218,15 +1219,23 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   const tollsTotal  = tolls * numStops;
   const total       = fuel + perdiemTotal + tollsTotal + wear + lodging;
   const net         = rate - total;
-  const rpm         = rate / miles;
+  const rpm         = rate / totalTripMiles;
 
   // Deadhead row
-  if (unpaidMiles > 0) {
-    const dhFuel = (unpaidMiles / mpg) * diesel;
+  if (deadheadMiles > 0) {
+    const dhFuel = (deadheadMiles / mpg) * diesel;
     DOM.bkDeadheadRow.style.display = '';
-    DOM.bkDeadhead.textContent = unpaidMiles.toLocaleString() + ' mi · $' + dhFuel.toFixed(2) + ' fuel';
+    DOM.bkDeadhead.textContent = deadheadMiles.toLocaleString() + ' mi · $' + dhFuel.toFixed(2) + ' fuel';
   } else {
     DOM.bkDeadheadRow.style.display = 'none';
+  }
+  // Return home row
+  if (returnMiles > 0) {
+    const retFuel = (returnMiles / mpg) * diesel;
+    DOM.bkReturnRow.style.display = '';
+    DOM.bkReturn.textContent = returnMiles.toLocaleString() + ' mi · $' + retFuel.toFixed(2) + ' fuel';
+  } else {
+    DOM.bkReturnRow.style.display = 'none';
   }
 
   DOM.resMiles.textContent   = miles.toLocaleString();
