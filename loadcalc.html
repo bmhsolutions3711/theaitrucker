@@ -1612,7 +1612,7 @@ async function checkRouteWeather(fromCoords, toCoords) {
       document.getElementById('wxDetail').innerHTML = warnings.join('<br>');
       banner.className = 'wx-banner show ' + (isDanger ? 'danger' : 'warn');
     }
-  } catch(e) { /* silently fail — weather is advisory only */ }
+  } catch(e) { console.warn('Weather check error:', e.message, e); }
 }
 
 // ── GPS location detection ──
