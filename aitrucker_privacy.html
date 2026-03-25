@@ -67,6 +67,16 @@
 
   <h2>4. Local Storage</h2>
   <p>The AI Trucker uses browser localStorage to save your calculator settings on your device. This data is stored locally and is not transmitted to our servers. You can clear this data at any time by clearing your browser data.</p>
+  <p>We also store an anonymous identifier in localStorage to count unique users. This identifier contains no personal information and cannot be used to identify you.</p>
+
+  <h2>4a. Analytics</h2>
+  <p>We collect anonymous usage analytics to improve the Service. This includes:</p>
+  <ul>
+    <li>Page views and feature usage (e.g., calculations performed, voice input usage)</li>
+    <li>An anonymous session identifier stored in localStorage (not a cookie)</li>
+    <li>General interaction patterns (button clicks, load profile selections)</li>
+  </ul>
+  <p>This data is aggregated and cannot be used to personally identify you. We do not use third-party tracking services, advertising pixels, or cookies. Analytics data is stored in our private Google Sheets database and is never shared with third parties.</p>
 
   <h2>5. Payment Processing</h2>
   <p>All payments are processed by Stripe, Inc. Your payment information is transmitted directly to Stripe and is never stored on our servers. Stripe's privacy policy is available at <a href="https://stripe.com/privacy">stripe.com/privacy</a>.</p>
@@ -77,6 +87,8 @@
     <li><strong>OpenStreetMap / Nominatim</strong> — geocoding for route calculation</li>
     <li><strong>OSRM</strong> — route distance calculation</li>
     <li><strong>Cloudflare</strong> — DNS, CDN, and security services</li>
+    <li><strong>OpenWeatherMap</strong> — weather data for route weather advisories</li>
+    <li><strong>Google Apps Script</strong> — anonymous analytics processing</li>
   </ul>
 
   <h2>7. Data Retention</h2>
