@@ -1499,7 +1499,7 @@ function setStatus(msg) { document.getElementById('statusMsg').textContent = msg
 // ── Route weather check (via server-side proxy) ──
 const API_PROXY = 'https://script.google.com/macros/s/AKfycbzXLB-B5Wu6IpnEVoTuetxu6jelaOem61TgSOIhc7uV1iVMZtxku5XTxf2Up68JIHQU/exec';
 const WX_BAD = new Set([200,201,202,210,211,212,221,230,231,232, // thunderstorm
-  502,503,504,511,       // heavy/freezing rain
+  500,501,502,503,504,511,       // rain (light through freezing)
   600,601,602,611,612,613,615,616,620,621,622, // snow
   711,731,751,761,762,771,781 // smoke, dust, tornado
 ]);
@@ -1521,7 +1521,7 @@ async function fetchForecast(lat, lon) {
   const cached = cacheGet(cacheKey, WX_CACHE_TTL);
   if (cached) return cached;
   try {
-    const r = await fetch(API_PROXY + '?action=forecast&lat=' + lat + '&lon=' + lon);
+    const r = await fetch(API_PROXY + '?action=forecast&lat=' + lat + '&lon=' + lon, {redirect:'follow'});
     const d = await r.json();
     const result = (d.list || []).map(item => ({
       dt_txt: item.dt_txt,
