@@ -1440,7 +1440,16 @@ function updateEyebrow() {
       const items = list.querySelectorAll('.ac-item');
       const showing = list.classList.contains('show') && items.length > 0;
       // Tab: select first suggestion if list is visible
-      if (e.key === 'Tab' && showing) { e.preventDefault(); items[activeIdx >= 0 ? activeIdx : 0].click(); return; }
+      if (e.key === 'Tab' && showing) {
+        e.preventDefault();
+        const idx = activeIdx >= 0 ? activeIdx : 0;
+        const item = items[idx];
+        inp.value = item.textContent;
+        list.classList.remove('show');
+        if (inp.id === 'origin') document.getElementById('dest').focus();
+        else if (inp.id === 'dest') document.getElementById('rate').focus();
+        return;
+      }
       if (!showing) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, items.length - 1); highlightItem(items); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlightItem(items); }
