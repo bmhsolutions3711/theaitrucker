@@ -1521,8 +1521,10 @@ async function fetchForecast(lat, lon) {
   const cached = cacheGet(cacheKey, WX_CACHE_TTL);
   if (cached) return cached;
   try {
-    const r = await fetch(API_PROXY + '?action=forecast&lat=' + lat + '&lon=' + lon, {redirect:'follow'});
-    const d = await r.json();
+    const r = await fetch(API_PROXY + '?action=forecast&lat=' + lat + '&lon=' + lon);
+    const txt = await r.text();
+    let d;
+    try { d = JSON.parse(txt); } catch(pe) { console.warn('Forecast parse error:', txt.substring(0, 200)); return []; }
     const result = (d.list || []).map(item => ({
       dt_txt: item.dt_txt,
       temp: item.main?.temp || 50,
