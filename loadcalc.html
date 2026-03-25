@@ -518,6 +518,23 @@
     .success-btn:hover { background:#00ff87; }
     .success-skip { width:100%; padding:8px; background:transparent; border:none; color:var(--dim); font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif; }
     .restore-msg { text-align:center; font-size:13px; min-height:18px; margin-bottom:8px; }
+
+    /* ── DISCLAIMER MODAL ── */
+    .disclaimer-overlay { display:none; position:fixed; inset:0; z-index:1001; background:rgba(0,0,0,.85); backdrop-filter:blur(16px); align-items:center; justify-content:center; padding:20px; }
+    .disclaimer-overlay.show { display:flex; }
+    .disclaimer-sheet { background:#141414; border-radius:16px; padding:32px 24px; width:100%; max-width:460px; border:1px solid var(--border2); max-height:85vh; overflow-y:auto; }
+    .disclaimer-icon { text-align:center; font-size:36px; margin-bottom:12px; }
+    .disclaimer-title { font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:var(--yellow); text-align:center; margin-bottom:6px; }
+    .disclaimer-sub { font-size:13px; color:var(--mid); text-align:center; margin-bottom:20px; line-height:1.5; }
+    .disclaimer-body { font-size:13px; color:var(--mid); line-height:1.7; margin-bottom:20px; }
+    .disclaimer-body strong { color:var(--white); }
+    .disclaimer-body ul { padding-left:18px; margin:8px 0; }
+    .disclaimer-body li { margin-bottom:4px; }
+    .disclaimer-links { text-align:center; font-size:12px; margin-bottom:18px; }
+    .disclaimer-links a { color:var(--mid); text-decoration:underline; transition:color .15s; }
+    .disclaimer-links a:hover { color:var(--yellow); }
+    .disclaimer-accept { width:100%; padding:15px; background:var(--yellow); border:none; border-radius:var(--r); color:#000; font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:800; letter-spacing:.3px; cursor:pointer; transition:all .2s; }
+    .disclaimer-accept:hover { background:#ffe033; }
   </style>
 </head>
 <body>
@@ -716,7 +733,11 @@
       <div class="wx-detail" id="wxDetail"></div>
     </div>
     <button class="reset-btn" onclick="resetCalc()">↩ Calculate Another Load</button>
-    <p style="text-align:center;font-size:11px;color:var(--dim);margin-top:12px;line-height:1.5">Estimates only — not financial advice. Distances via OSRM may differ from actual. Weather data from OpenWeatherMap for reference only. Always verify independently. <a href="aitrucker_terms.html" style="color:var(--dim);text-decoration:underline">Terms</a> · <a href="aitrucker_privacy.html" style="color:var(--dim);text-decoration:underline">Privacy</a></p>
+    <div style="text-align:center;font-size:11px;color:var(--mid);margin-top:16px;line-height:1.6;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px">
+      <strong style="color:var(--yellow);font-size:12px;letter-spacing:.03em">DISCLAIMER</strong><br>
+      LoadCalc provides <em>estimates only</em> for informational and educational purposes. Results do not constitute financial, business, tax, or professional advice and should not be the sole basis for any business decision. Actual costs, distances, fuel consumption, and profitability will vary based on equipment, driving conditions, and other factors. Route distances via OSRM may differ from actual road miles. Weather data from OpenWeatherMap is for general reference only — always check official sources. Use of this tool does not create an advisory or fiduciary relationship. Consult a qualified professional before making financial decisions.
+      <br><a href="aitrucker_terms.html" style="color:var(--mid);text-decoration:underline">Terms &amp; Conditions</a> · <a href="aitrucker_privacy.html" style="color:var(--mid);text-decoration:underline">Privacy Policy</a>
+    </div>
   </div>
 
 </div>
@@ -726,8 +747,8 @@
     Built by a hotshot trucker who got tired of guessing.<br>
     <a href="mailto:owner@bmh-solutions.com">owner@bmh-solutions.com</a><br>
     <span style="font-size:11px;color:var(--dim)">Settings save locally — clearing browser data resets them</span>
-    &nbsp;·&nbsp; <a href="privacy.html">Privacy</a>
-    &nbsp;·&nbsp; <a href="terms.html">Terms</a>
+    &nbsp;·&nbsp; <a href="aitrucker_privacy.html">Privacy</a>
+    &nbsp;·&nbsp; <a href="aitrucker_terms.html">Terms</a>
   </p>
 </div>
 
@@ -779,6 +800,31 @@
   </div>
 </div>
 
+<!-- Disclaimer Acceptance Modal -->
+<div class="disclaimer-overlay" id="disclaimerOverlay">
+  <div class="disclaimer-sheet">
+    <div class="disclaimer-icon">&#9878;</div>
+    <div class="disclaimer-title">Before You Calculate</div>
+    <div class="disclaimer-sub">Please review and acknowledge the following</div>
+    <div class="disclaimer-body">
+      <strong>LoadCalc is an estimation tool — not a financial advisor.</strong>
+      <ul>
+        <li>All calculations are <strong>estimates only</strong> based on user-provided inputs and publicly available data</li>
+        <li>Results do not constitute financial, business, tax, or professional advice</li>
+        <li>Actual costs, distances, fuel consumption, and profitability <strong>will vary</strong> based on equipment, driving conditions, routes, and other factors</li>
+        <li>Go/No-Go verdicts indicate whether a load meets <em>your stated thresholds</em> — they are not recommendations to accept or reject any load</li>
+        <li>Weather and route data come from third-party sources and may not reflect real-time conditions</li>
+        <li>Use of this tool does not create an advisory, fiduciary, or professional relationship</li>
+      </ul>
+      <strong>Always verify routes, costs, and load details independently before making business decisions.</strong>
+    </div>
+    <div class="disclaimer-links">
+      <a href="aitrucker_terms.html" target="_blank">Terms &amp; Conditions</a> &nbsp;&middot;&nbsp; <a href="aitrucker_privacy.html" target="_blank">Privacy Policy</a>
+    </div>
+    <button class="disclaimer-accept" onclick="acceptDisclaimer()">I Understand — Let's Calculate</button>
+  </div>
+</div>
+
 <script>
 // ── Config ──
 const MPG_HOTSHOT  = {under:15, over:11, heavy:9};
@@ -801,6 +847,15 @@ let stopId       = 0;
 let calcCount    = parseInt(localStorage.getItem('lc_count') || '0');
 let isPro        = localStorage.getItem('lc_pro') === '1';
 let settingsOpen = false;
+let disclaimerAccepted = localStorage.getItem('lc_disclaimer') === '1';
+
+// ── Disclaimer ──
+function showDisclaimer() { document.getElementById('disclaimerOverlay').classList.add('show'); }
+function acceptDisclaimer() {
+  disclaimerAccepted = true;
+  localStorage.setItem('lc_disclaimer', '1');
+  document.getElementById('disclaimerOverlay').classList.remove('show');
+}
 
 // ── Settings accordion ──
 function toggleSettings() {
@@ -1077,6 +1132,7 @@ async function routeMiles(fc, tc) {
 
 // ── Calculate single ──
 async function calculate() {
+  if (!disclaimerAccepted) { showDisclaimer(); return; }
   if (!isPro && calcCount >= FREE_LIMIT) { showPaywall(); return; }
   const origin = document.getElementById('origin').value.trim();
   const dest   = document.getElementById('dest').value.trim();
