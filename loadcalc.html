@@ -360,7 +360,10 @@
     .calc-btn:active { transform:scale(.99); }
 
     /* ── STATUS ── */
-    .status { text-align:center; font-size:13px; color:var(--yellow); min-height:20px; padding:8px 0; font-weight:400; }
+    .status { text-align:center; font-size:13px; color:var(--yellow); min-height:0; padding:0; font-weight:500; overflow:hidden; max-height:0; transition:max-height .3s ease, padding .3s ease, opacity .3s ease; opacity:0; }
+    .status.active { max-height:60px; padding:10px 0; opacity:1; }
+    .status .truck-spin { display:inline-block; animation:spin 1s linear infinite; }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 
     /* ── RESULTS ── */
     .results { margin-top:10px; }
@@ -525,9 +528,9 @@
     .disclaimer-sheet { background:#141414; border-radius:16px; padding:32px 24px; width:100%; max-width:460px; border:1px solid var(--border2); max-height:85vh; overflow-y:auto; }
     .disclaimer-icon { text-align:center; font-size:36px; margin-bottom:12px; }
     .disclaimer-title { font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:var(--yellow); text-align:center; margin-bottom:6px; }
-    .disclaimer-sub { font-size:13px; color:var(--mid); text-align:center; margin-bottom:20px; line-height:1.5; }
-    .disclaimer-body { font-size:13px; color:var(--mid); line-height:1.7; margin-bottom:20px; }
-    .disclaimer-body strong { color:var(--white); }
+    .disclaimer-sub { font-size:13px; color:#d1d5db; text-align:center; margin-bottom:20px; line-height:1.5; }
+    .disclaimer-body { font-size:13px; color:#e5e7eb; line-height:1.7; margin-bottom:20px; }
+    .disclaimer-body strong { color:#ffffff; }
     .disclaimer-body ul { padding-left:18px; margin:8px 0; }
     .disclaimer-body li { margin-bottom:4px; }
     .disclaimer-links { text-align:center; font-size:12px; margin-bottom:18px; }
@@ -551,7 +554,6 @@
   <div class="hero-eyebrow" id="hero-eyebrow">✓ Free to try — no signup &nbsp;·&nbsp; <a href="index.html#pricing">See plans</a></div>
   <h1>LOAD<em>CALC</em></h1>
   <p class="hero-sub">Know before you go.</p>
-  <div class="status" id="statusMsg" style="min-height:20px"></div>
 </div>
 
 <div class="trial-bar" id="trialBar">
@@ -628,6 +630,7 @@
     </div>
   </div>
 
+  <div class="status" id="statusMsg"></div>
   <button class="calc-btn" onclick="appMode==='single'?calculate():calculateMulti()">Calculate This Load</button>
 
   <!-- Load profile -->
@@ -711,7 +714,7 @@
       <div class="verdict-sub" id="verdictSub"></div>
     </div>
     <div class="stats-grid">
-      <div class="stat"><div class="st-label">Distance</div><div class="st-val" id="resMiles">—</div><div class="st-sub">miles</div></div>
+      <div class="stat"><div class="st-label">Distance</div><div class="st-val" id="resMiles">—</div><div class="st-sub" id="resMilesSub">miles</div></div>
       <div class="stat"><div class="st-label">Gross Rate</div><div class="st-val" id="resGross">—</div><div class="st-sub">offered</div></div>
       <div class="stat"><div class="st-label">Net Profit</div><div class="st-val" id="resNet">—</div><div class="st-sub">after expenses</div></div>
       <div class="stat"><div class="st-label">Gallons</div><div class="st-val" id="resGallons">—</div><div class="st-sub">diesel needed</div></div>
@@ -1178,6 +1181,8 @@ async function calculate() {
     localStorage.setItem('lc_last_origin', origin);
     localStorage.setItem('lc_last_dest', dest);
     localStorage.setItem('lc_last_rate', rate);
+    window._lastFromCoords = fc;
+    window._lastToCoords = tc;
     showResults(miles, rate, 1, deadheadMiles, returnMiles);
     renderRouteMap({ fc, tc, cc, routeGeometry, dhGeometry, retGeometry });
     setStatus('');
@@ -1254,6 +1259,8 @@ async function calculateMulti() {
     document.getElementById('run-summary-rows').innerHTML = rsRows;
     document.getElementById('run-summary').style.display = '';
 
+    window._lastFromCoords = firstPickupCoords;
+    window._lastToCoords = lastDropCoords;
     showResults(totalMiles, totalRate, valid.length, deadheadMiles, returnMiles);
     // Combine all geometries for multi-stop map
     const combinedGeometry = allGeometries.length ? { type:'GeometryCollection', geometries: allGeometries } : null;
@@ -1325,6 +1332,16 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   }
 
   DOM.resMiles.textContent   = miles.toLocaleString();
+  // Drive time sub-label
+  const loadDriveHrs = miles / speed;
+  const hrs = Math.floor(loadDriveHrs);
+  const mins = Math.round((loadDriveHrs - hrs) * 60);
+  let distSub = 'miles · ~' + hrs + 'h' + (mins > 0 ? ' ' + mins + 'm' : '') + ' drive';
+  // Timezone change detection
+  const fromTZ = _getTimezone(window._lastFromCoords);
+  const toTZ = _getTimezone(window._lastToCoords);
+  if (fromTZ && toTZ && fromTZ !== toTZ) distSub += ' · ' + fromTZ + ' → ' + toTZ;
+  document.getElementById('resMilesSub').textContent = distSub;
   DOM.resGross.textContent   = '$' + rate.toLocaleString();
   DOM.resNet.textContent     = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString();
   DOM.resGallons.textContent = Math.round(totalTripMiles / mpg);
@@ -1564,7 +1581,43 @@ function updateEyebrow() {
   setupAC('dest', 'ac-dest');
 })();
 
-function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
+// ── Timezone detection from longitude ──
+function _getTimezone(coords) {
+  if (!coords) return null;
+  const lon = coords.lon || coords.lng || coords[1];
+  if (lon == null) return null;
+  // Approximate US timezone boundaries by longitude
+  if (lon > -67.5) return 'AST';
+  if (lon > -82.5) return 'ET';
+  if (lon > -97.5) return 'CT';
+  if (lon > -112.5) return 'MT';
+  if (lon > -120) return 'PT';
+  return 'PT';
+}
+
+const ROAD_MSGS = [
+  'Firing up the rig…', 'Checking the mirrors…', 'Rolling down the highway…',
+  'Crunching the numbers…', 'Mapping your route…', 'Fueling up the calculator…',
+  'Dodging potholes…', 'Scanning the horizon…', 'Hauling your data…',
+  'Shifting gears…', 'Checking the load board…', 'Running the numbers, driver…',
+  'Pedal to the metal…', 'Hammer down…', 'Breaker breaker…',
+  'Keep it between the ditches…', 'Pulling into the weigh station…'
+];
+let _roadInterval = null;
+function setStatus(msg) {
+  const el = document.getElementById('statusMsg');
+  if (_roadInterval) { clearInterval(_roadInterval); _roadInterval = null; }
+  if (!msg) { el.innerHTML = ''; el.classList.remove('active'); return; }
+  el.innerHTML = '<span class="truck-spin">🚛</span> ' + msg;
+  el.classList.add('active');
+  if (msg.includes('alculating') || msg.includes('route') || msg.includes('deadhead') || msg.includes('Looking')) {
+    let i = 0;
+    _roadInterval = setInterval(() => {
+      el.innerHTML = '<span class="truck-spin">🚛</span> ' + ROAD_MSGS[i % ROAD_MSGS.length];
+      i++;
+    }, 2200);
+  }
+}
 
 // ── Route weather check (via server-side proxy) ──
 const API_PROXY = 'https://script.google.com/macros/s/AKfycbzXLB-B5Wu6IpnEVoTuetxu6jelaOem61TgSOIhc7uV1iVMZtxku5XTxf2Up68JIHQU/exec';
