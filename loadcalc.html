@@ -1331,7 +1331,7 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
     DOM.bkReturnRow.style.display = 'none';
   }
 
-  DOM.resMiles.innerHTML = '<span style="color:transparent">+$</span>' + miles.toLocaleString();
+  DOM.resMiles.textContent = miles.toLocaleString();
   // Drive time — decimal hours rounded to 1 place
   const loadDriveHrs = miles / speed;
   document.getElementById('resDriveTime').textContent = Math.ceil(loadDriveHrs * 10) / 10;
