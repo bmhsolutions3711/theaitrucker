@@ -1516,6 +1516,24 @@ async function fetchWeather(lat, lon) {
   return result;
 }
 
+async function fetchForecast(lat, lon) {
+  const cacheKey = 'fc_' + Math.round(lat*100) + '_' + Math.round(lon*100);
+  const cached = cacheGet(cacheKey, WX_CACHE_TTL);
+  if (cached) return cached;
+  try {
+    const r = await fetch(API_PROXY + '?action=forecast&lat=' + lat + '&lon=' + lon);
+    const d = await r.json();
+    const result = (d.list || []).map(item => ({
+      dt_txt: item.dt_txt,
+      temp: item.main?.temp || 50,
+      weather: item.weather?.[0] || {},
+      name: d.city?.name || ''
+    }));
+    cacheSet(cacheKey, result);
+    return result;
+  } catch(e) { return []; }
+}
+
 async function checkRouteWeather(fromCoords, toCoords) {
   const banner = document.getElementById('wxBanner');
   banner.classList.remove('show','warn','danger');
@@ -1527,13 +1545,18 @@ async function checkRouteWeather(fromCoords, toCoords) {
       { label: 'Midpoint', lat: mid.lat, lon: mid.lon },
       { label: 'Delivery', lat: toCoords.lat, lon: toCoords.lon }
     ];
-    const results = await Promise.all(points.map(p =>
-      fetchWeather(p.lat, p.lon).then(d => ({ label: p.label, ...d }))
-    ));
+
+    // Fetch current weather AND 24hr forecast for all points in parallel
+    const [currentResults, forecastResults] = await Promise.all([
+      Promise.all(points.map(p => fetchWeather(p.lat, p.lon).then(d => ({ label: p.label, ...d })))),
+      Promise.all(points.map(p => fetchForecast(p.lat, p.lon).then(items => ({ label: p.label, items }))))
+    ]);
 
     const warnings = [];
     let isDanger = false;
-    results.forEach(r => {
+
+    // Check current conditions
+    currentResults.forEach(r => {
       const id = r.weather.id || 0;
       const desc = r.weather.description || '';
       const temp = r.main.temp || 50;
@@ -1541,8 +1564,8 @@ async function checkRouteWeather(fromCoords, toCoords) {
 
       if (WX_BAD.has(id)) {
         warnings.push('⚠️ ' + loc + ': ' + desc);
-        if (id >= 600 && id < 700) isDanger = true; // snow/ice = danger
-        if (id >= 200 && id < 300) isDanger = true; // thunderstorm = danger
+        if (id >= 600 && id < 700) isDanger = true;
+        if (id >= 200 && id < 300) isDanger = true;
       }
       if (temp <= 32) {
         warnings.push('🥶 ' + loc + ': ' + Math.round(temp) + '°F — freezing conditions');
@@ -1550,6 +1573,36 @@ async function checkRouteWeather(fromCoords, toCoords) {
       } else if (temp <= 40) {
         warnings.push('❄️ ' + loc + ': ' + Math.round(temp) + '°F — near freezing');
       }
+    });
+
+    // Check 24hr forecast
+    const seen = new Set();
+    forecastResults.forEach(fr => {
+      (fr.items || []).forEach(item => {
+        const id = item.weather.id || 0;
+        const desc = item.weather.description || '';
+        const temp = item.temp || 50;
+        const loc = item.name || fr.label;
+        const time = (item.dt_txt || '').split(' ')[1]?.substring(0, 5) || '';
+        const key = loc + '_' + id + '_' + (temp <= 32 ? 'freeze' : temp <= 40 ? 'cold' : '');
+
+        if (seen.has(key)) return;
+
+        if (WX_BAD.has(id)) {
+          seen.add(key);
+          warnings.push('🔮 ' + loc + ' (' + time + '): ' + desc + ' expected');
+          if (id >= 600 && id < 700) isDanger = true;
+          if (id >= 200 && id < 300) isDanger = true;
+        }
+        if (temp <= 32 && !seen.has(key)) {
+          seen.add(key);
+          warnings.push('🔮 ' + loc + ' (' + time + '): ' + Math.round(temp) + '°F — freezing expected');
+          isDanger = true;
+        } else if (temp <= 40 && !seen.has(key)) {
+          seen.add(key);
+          warnings.push('🔮 ' + loc + ' (' + time + '): ' + Math.round(temp) + '°F — near freezing expected');
+        }
+      });
     });
 
     if (warnings.length) {
