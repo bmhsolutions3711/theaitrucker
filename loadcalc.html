@@ -714,7 +714,7 @@
       <div class="verdict-sub" id="verdictSub"></div>
     </div>
     <div class="stats-grid">
-      <div class="stat"><div class="st-label">Distance</div><div class="st-val" id="resMiles">—</div><div class="st-sub" id="resMilesSub">miles</div></div>
+      <div class="stat"><div class="st-label">Distance</div><div class="st-val" id="resMiles">—</div><div class="st-sub">miles</div><div class="st-val" id="resDriveTime" style="font-size:20px;margin-top:4px">—</div><div class="st-sub">hr drive</div><div id="resTZWrap" style="display:none"><div class="st-val" id="resTZShift" style="font-size:20px;margin-top:4px">—</div><div class="st-sub" id="resTZSub"></div></div></div>
       <div class="stat"><div class="st-label">Gross Rate</div><div class="st-val" id="resGross">—</div><div class="st-sub">offered</div></div>
       <div class="stat"><div class="st-label">Net Profit</div><div class="st-val" id="resNet">—</div><div class="st-sub">after expenses</div></div>
       <div class="stat"><div class="st-label">Gallons</div><div class="st-val" id="resGallons">—</div><div class="st-sub">diesel needed</div></div>
@@ -1332,16 +1332,22 @@ function showResults(miles, rate, numStops, deadheadMiles, returnMiles) {
   }
 
   DOM.resMiles.textContent   = miles.toLocaleString();
-  // Drive time sub-label
+  // Drive time — decimal hours rounded to 1 place
   const loadDriveHrs = miles / speed;
-  const hrs = Math.floor(loadDriveHrs);
-  const mins = Math.round((loadDriveHrs - hrs) * 60);
-  let distSub = 'miles · ~' + hrs + 'h' + (mins > 0 ? ' ' + mins + 'm' : '') + ' drive';
+  document.getElementById('resDriveTime').textContent = Math.ceil(loadDriveHrs * 10) / 10;
   // Timezone change detection
   const fromTZ = _getTimezone(window._lastFromCoords);
   const toTZ = _getTimezone(window._lastToCoords);
-  if (fromTZ && toTZ && fromTZ !== toTZ) distSub += ' · ' + fromTZ + ' → ' + toTZ;
-  document.getElementById('resMilesSub').textContent = distSub;
+  const tzWrap = document.getElementById('resTZWrap');
+  if (fromTZ && toTZ && fromTZ !== toTZ) {
+    const TZ_OFFSETS = {AST:-4, ET:-5, CT:-6, MT:-7, PT:-8};
+    const diff = (TZ_OFFSETS[toTZ] || 0) - (TZ_OFFSETS[fromTZ] || 0);
+    document.getElementById('resTZShift').textContent = (diff > 0 ? '+' : '') + diff;
+    document.getElementById('resTZSub').textContent = fromTZ + ' → ' + toTZ;
+    tzWrap.style.display = '';
+  } else {
+    tzWrap.style.display = 'none';
+  }
   DOM.resGross.textContent   = '$' + rate.toLocaleString();
   DOM.resNet.textContent     = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString();
   DOM.resGallons.textContent = Math.round(totalTripMiles / mpg);
