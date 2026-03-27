@@ -1897,18 +1897,38 @@ function showSuccessOverlay() {
   setTimeout(() => document.getElementById('successEmail').focus(), 200);
 }
 
-function submitSuccessEmail() {
+async function submitSuccessEmail() {
   const email = document.getElementById('successEmail').value.trim().toLowerCase();
-  if (email && email.includes('@')) {
-    localStorage.setItem('lc_pro_email', email);
-    registerProEmail(email);
-    if (window.lcTrack) lcTrack('email_registered', email, 'payment');
+  if (!email || !email.includes('@')) {
+    setStatus('Please enter a valid email address.');
+    return;
   }
-  closeSuccessOverlay();
+  setStatus('Verifying your purchase...');
+  try {
+    await registerProEmail(email);
+    // Verify the email is actually registered server-side before granting Pro
+    const r = await fetch(API_PROXY + '?action=pro_check&email=' + encodeURIComponent(email));
+    const d = await r.json();
+    if (d.pro) {
+      localStorage.setItem('lc_pro', '1');
+      localStorage.setItem('lc_pro_email', email);
+      isPro = true;
+      updateTrialBar(); closePaywall();
+      if (window.lcTrack) lcTrack('email_registered', email, 'payment');
+      closeSuccessOverlay();
+    } else {
+      setStatus('Email not found. Please use the email from your Stripe receipt.');
+    }
+  } catch(e) {
+    console.warn('Pro verification failed', e);
+    setStatus('Verification failed — please try again.');
+  }
 }
 
 function skipSuccessEmail() {
-  closeSuccessOverlay();
+  // Without email verification, no Pro unlock — just close the overlay
+  document.getElementById('successOverlay').classList.remove('show');
+  setStatus('Enter your email to unlock Pro. Use "Restore Access" anytime.');
 }
 
 function closeSuccessOverlay() {
@@ -1935,10 +1955,10 @@ function toggleTheme() {
 (function() {
   const p = new URLSearchParams(window.location.search);
   if (p.get('success') === '1') {
-    localStorage.setItem('lc_pro','1'); isPro = true;
-    updateTrialBar(); closePaywall();
-    setStatus('🎉 LoadCalc Pro unlocked. Unlimited calculations.');
+    // Don't trust the URL param alone — show email capture overlay
+    // Pro status is only granted after email is verified against JSONBin
     window.history.replaceState({}, '', window.location.pathname);
+    showSuccessOverlay();
   }
 })();
 
