@@ -1884,9 +1884,10 @@ function updateRestoreLink() {
 async function registerProEmail(email) {
   if (!email) return;
   try {
-    await fetch(API_PROXY, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'pro_register', email: email })
+    // Use GET with redirect-follow to work with Google Apps Script CORS
+    await fetch(API_PROXY + '?action=pro_register&email=' + encodeURIComponent(email), {
+      method: 'GET',
+      redirect: 'follow'
     });
   } catch(e) { console.warn('Could not register pro email', e); }
 }
