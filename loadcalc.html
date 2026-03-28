@@ -327,7 +327,7 @@
       overflow:hidden; max-height:0;
       transition:max-height .35s cubic-bezier(.4,0,.2,1);
     }
-    .settings-body.open { max-height:400px; }
+    .settings-body.open { max-height:600px; overflow:visible; }
     .settings-grid {
       display:grid; grid-template-columns:1fr 1fr;
       gap:1px; background:var(--border);
@@ -668,8 +668,11 @@
     <div class="settings-body" id="settings-body">
       <div class="s-field" style="grid-column:1/-1;margin-bottom:4px">
         <div class="s-label">📍 Current Location</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input class="s-inp" id="curloc" type="text" placeholder="e.g. North Canton OH" style="flex:1">
+        <div style="display:flex;gap:8px;align-items:center;position:relative;z-index:51">
+          <div style="flex:1;position:relative">
+            <input class="s-inp" id="curloc" type="text" placeholder="e.g. North Canton OH" style="width:100%">
+            <div class="ac-list" id="ac-curloc"></div>
+          </div>
           <button id="gpsBtn" onclick="detectLocation()" style="background:var(--yellow);color:#000;border:none;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;white-space:nowrap;font-weight:600" title="Use my location">📍 GPS</button>
         </div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--mid);cursor:pointer">
@@ -982,7 +985,7 @@ function saveSettings() {
 }
 SETTINGS.forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('change', saveSettings);
+  if (el) { el.addEventListener('change', saveSettings); el.addEventListener('input', saveSettings); }
 });
 // Persist "Get me home" checkbox
 document.getElementById('gethome').checked = localStorage.getItem('lc_gethome') === '1';
@@ -1044,9 +1047,11 @@ function parseVoice(text) {
     if (stopMatch) {
       const raw = stopMatch[1].toLowerCase();
       const stopNum = (wordNums[raw] || parseInt(raw)) - 1; // 0-indexed
-      const rest    = stopMatch[2];
-      const rm  = rest.match(/rate\s+\$?(\d+)/i) || rest.match(/\$(\d{3,4})/i);
-      const tm  = rest.match(/^(.+?)\s+to\s+(.+?)(?:\s+rate|\s+\$|\s*$)/i);
+      let rest = stopMatch[2];
+      const rm  = rest.match(/(?:rate|route)\s+\$?(\d+)/i) || rest.match(/\$(\d{3,4})/i) || rest.match(/(\d{3,4})\s*dollars/i);
+      // Strip rate from rest before parsing cities
+      rest = rest.replace(/\s*(?:rate|route)\s+\$?\d+/i, '').replace(/\s*\$\d{3,4}/i, '').replace(/\s*\d{3,4}\s*dollars/i, '').trim();
+      const tm  = rest.match(/^(.+?)\s+to\s+(.+)/i);
       if (stopNum >= 0 && stopNum < stops.length) {
         const s = stops[stopNum];
         if (tm) { s.origin = capCity(tm[1].trim()); s.dest = capCity(tm[2].trim()); }
@@ -1060,10 +1065,13 @@ function parseVoice(text) {
       setStatus('Say "Stop 1 Dallas TX to Nashville TN rate 850"');
     }
   } else {
-    // Single mode — original behavior
-    const rm = t.match(/rate\s+\$?(\d+)/i) || t.match(/\$(\d{3,4})/i);
+    // Single mode — extract rate first, then strip it from the transcript
+    // "route" is a common speech-to-text misinterpretation of "rate"
+    const rm = t.match(/(?:rate|route)\s+\$?(\d+)/i) || t.match(/\$(\d{3,4})/i) || t.match(/(\d{3,4})\s*dollars/i);
     if (rm) document.getElementById('rate').value = rm[1];
-    const tm = t.match(/(?:from\s+)?(.+?)\s+to\s+(.+?)(?:\s+rate|\s+\$|\s*$)/i);
+    // Strip rate/dollar references so they don't pollute city names
+    const clean = t.replace(/\s*(?:rate|route)\s+\$?\d+/i, '').replace(/\s*\$\d{3,4}/i, '').replace(/\s*\d{3,4}\s*dollars/i, '').trim();
+    const tm = clean.match(/(?:from\s+)?(.+?)\s+to\s+(.+)/i);
     if (tm) {
       document.getElementById('origin').value = capCity(tm[1].trim());
       document.getElementById('dest').value   = capCity(tm[2].trim());
@@ -1072,27 +1080,46 @@ function parseVoice(text) {
 }
 
 function capCity(s) {
-  var result = s.replace(/\b\w/g, c => c.toUpperCase())
-    .replace(/\b(Tx|Tn|Oh|Ga|Fl|Ca|Ny|Il|Pa|Nc|Va|Az|Co|Wa|Or|Mo|Sc|Al|La|Ms|Ar|Ky|Wv|Md|De|Ct|Nj|Ma|Mn|Wi|Mi|Ia|In|Nd|Sd|Ne|Ks|Ok|Nm|Id|Mt|Wy|Nv|Ut)\b/g, m => m.toUpperCase());
+  var result = s.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  // Normalize state abbreviations to uppercase
+  const STATES = /\b(Al|Ak|Az|Ar|Ca|Co|Ct|De|Fl|Ga|Hi|Id|Il|In|Ia|Ks|Ky|La|Me|Md|Ma|Mi|Mn|Ms|Mo|Mt|Ne|Nv|Nh|Nj|Nm|Ny|Nc|Nd|Oh|Ok|Or|Pa|Ri|Sc|Sd|Tn|Tx|Ut|Vt|Va|Wa|Wv|Wi|Wy)\b/gi;
+  result = result.replace(STATES, m => m.toUpperCase());
   // Add comma before state abbreviation if missing (e.g. "Dallas TX" → "Dallas, TX")
-  result = result.replace(/\s+(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)$/i, ', $1');
-  return result;
+  // Only add comma if one isn't already there
+  if (!result.includes(',')) {
+    result = result.replace(/\s+(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(\s*\d*\s*)$/i, ', $1$2');
+  }
+  // Handle full state names — "Dallas Texas" → "Dallas, TX"
+  const STATE_MAP = {Alabama:'AL',Alaska:'AK',Arizona:'AZ',Arkansas:'AR',California:'CA',Colorado:'CO',Connecticut:'CT',Delaware:'DE',Florida:'FL',Georgia:'GA',Hawaii:'HI',Idaho:'ID',Illinois:'IL',Indiana:'IN',Iowa:'IA',Kansas:'KS',Kentucky:'KY',Louisiana:'LA',Maine:'ME',Maryland:'MD',Massachusetts:'MA',Michigan:'MI',Minnesota:'MN',Mississippi:'MS',Missouri:'MO',Montana:'MT',Nebraska:'NE',Nevada:'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND',Ohio:'OH',Oklahoma:'OK',Oregon:'OR',Pennsylvania:'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',Tennessee:'TN',Texas:'TX',Utah:'UT',Vermont:'VT',Virginia:'VA',Washington:'WA','West Virginia':'WV',Wisconsin:'WI',Wyoming:'WY'};
+  for (const [name, abbr] of Object.entries(STATE_MAP)) {
+    const re = new RegExp('\\b' + name + '\\s*$', 'i');
+    if (re.test(result)) {
+      result = result.replace(re, abbr);
+      // Ensure comma before the abbreviation we just inserted
+      if (!result.includes(',')) result = result.replace(/\s+(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\s*$/i, ', $1');
+      break;
+    }
+  }
+  return result.trim();
 }
 
 // ── Geocode + Route (with localStorage cache) ──
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_VER = 3; // Bump this when geocode/route logic changes to invalidate stale entries
 
 function cacheGet(key, ttl) {
   try {
     const raw = localStorage.getItem('lc_cache_' + key);
     if (!raw) return null;
-    const { val, ts } = JSON.parse(raw);
-    if (Date.now() - ts > (ttl || CACHE_TTL)) { localStorage.removeItem('lc_cache_' + key); return null; }
-    return val;
+    const parsed = JSON.parse(raw);
+    // Reject entries from older cache versions
+    if ((parsed.v || 0) !== CACHE_VER) { localStorage.removeItem('lc_cache_' + key); return null; }
+    if (Date.now() - parsed.ts > (ttl || CACHE_TTL)) { localStorage.removeItem('lc_cache_' + key); return null; }
+    return parsed.val;
   } catch(e) { return null; }
 }
 function cacheSet(key, val) {
-  try { localStorage.setItem('lc_cache_' + key, JSON.stringify({ val, ts: Date.now() })); } catch(e) {}
+  try { localStorage.setItem('lc_cache_' + key, JSON.stringify({ val, ts: Date.now(), v: CACHE_VER })); } catch(e) {}
 }
 
 async function geocode(city) {
@@ -1104,11 +1131,17 @@ async function geocode(city) {
     if (r.status === 429) { setStatus('⚠️ Too many requests — try again in a moment'); return null; }
     const d = await r.json();
     if (!d.length) return null;
-    // Prefer actual places over counties — filter out county-level results
-    // when a more specific match exists at the same name
-    const isCounty = r => (r.display_name || '').toLowerCase().includes('county') && r.type === 'administrative';
-    const nonCounty = d.filter(r => !isCounty(r));
-    const best = nonCounty.length > 0 ? nonCounty[0] : d[0];
+    // Prefer cities/towns/villages over counties and large admin areas
+    // A result IS a county if its display_name starts with the county name (e.g. "Jefferson County, Ohio")
+    // A result IN a county is fine (e.g. "Jefferson, Ashtabula County, Ohio")
+    const cityName = city.split(',')[0].trim().toLowerCase();
+    const isCountyResult = r => {
+      const dn = (r.display_name || '').toLowerCase();
+      // It's a county-level result if "county" appears right after the city name
+      return dn.startsWith(cityName + ' county') || (r.class === 'boundary' && r.type === 'administrative' && !r.address?.city && !r.address?.town && !r.address?.village);
+    };
+    const places = d.filter(r => !isCountyResult(r));
+    const best = places.length > 0 ? places[0] : d[0];
     const result = {lat: best.lat, lon: best.lon};
     cacheSet(key, result);
     return result;
@@ -1137,10 +1170,15 @@ async function routeMiles(fc, tc) {
 async function calculate() {
   if (!disclaimerAccepted) { showDisclaimer(); return; }
   if (!isPro && calcCount >= FREE_LIMIT) { showPaywall(); return; }
-  const origin = document.getElementById('origin').value.trim();
-  const dest   = document.getElementById('dest').value.trim();
+  const originEl = document.getElementById('origin');
+  const destEl   = document.getElementById('dest');
+  const origin = capCity(originEl.value);
+  const dest   = capCity(destEl.value);
+  originEl.value = origin; destEl.value = dest;
   const rate   = parseFloat(document.getElementById('rate').value) || 0;
-  const curloc = (document.getElementById('curloc').value || '').trim();
+  const curlocEl = document.getElementById('curloc');
+  const curloc = curlocEl.value.trim() ? capCity(curlocEl.value) : '';
+  if (curloc) curlocEl.value = curloc;
   if (!origin || !dest) { setStatus('Enter origin and destination'); return; }
   if (!rate) { setStatus('Enter the offered rate'); return; }
   setStatus('Looking up route…');
@@ -1194,9 +1232,13 @@ async function calculate() {
 // ── Calculate multi ──
 async function calculateMulti() {
   if (!isPro && calcCount >= FREE_LIMIT) { showPaywall(); return; }
+  stops.forEach(s => { s.origin = capCity(s.origin); s.dest = capCity(s.dest); });
+  renderStops();
   const valid = stops.filter(s => s.origin.trim() && s.dest.trim() && s.rate > 0);
   if (valid.length < 1) { setStatus('Fill in at least one complete stop'); return; }
-  const curloc = (document.getElementById('curloc').value || '').trim();
+  const curlocEl = document.getElementById('curloc');
+  const curloc = curlocEl.value.trim() ? capCity(curlocEl.value) : '';
+  if (curloc) curlocEl.value = curloc;
   setStatus('Calculating multi-stop route…');
   document.getElementById('results').classList.remove('show');
   try {
@@ -1501,41 +1543,35 @@ function updateEyebrow() {
 
 // ── City autocomplete ──
 (function() {
-  let acTimer = null;
-  let activeIdx = -1;
-
   const STATE_ABBR = {'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA','Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA','Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK','Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT','Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY'};
 
   function setupAC(inputId, listId) {
     const inp = document.getElementById(inputId);
     const list = document.getElementById(listId);
-    if (!inp || !list) return;
+    if (!inp || !list) { console.warn('AC setup failed:', inputId, listId); return; }
+    let timer = null;
+    let activeIdx = -1;
 
     inp.addEventListener('input', function() {
-      clearTimeout(acTimer);
+      clearTimeout(timer);
       const q = this.value.trim();
       if (q.length < 3) { list.classList.remove('show'); return; }
-      acTimer = setTimeout(() => fetchSuggestions(q, list, inp), 300);
+      timer = setTimeout(() => fetchSuggestions(q, list, inp, function() { activeIdx = -1; }), 300);
     });
 
     inp.addEventListener('keydown', function(e) {
       const items = list.querySelectorAll('.ac-item');
       const showing = list.classList.contains('show') && items.length > 0;
-      // Tab: select first suggestion if list is visible
       if (e.key === 'Tab' && showing) {
         e.preventDefault();
         const idx = activeIdx >= 0 ? activeIdx : 0;
-        const item = items[idx];
-        inp.value = item.textContent;
-        list.classList.remove('show');
-        if (inp.id === 'origin') document.getElementById('dest').focus();
-        else if (inp.id === 'dest') document.getElementById('rate').focus();
+        selectItem(inp, list, items[idx].textContent);
         return;
       }
       if (!showing) return;
-      if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, items.length - 1); highlightItem(items); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlightItem(items); }
-      else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); e.stopPropagation(); items[activeIdx].click(); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, items.length - 1); highlightItems(items, activeIdx); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlightItems(items, activeIdx); }
+      else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); e.stopPropagation(); selectItem(inp, list, items[activeIdx].textContent); }
       else if (e.key === 'Escape') { list.classList.remove('show'); }
     });
 
@@ -1544,19 +1580,27 @@ function updateEyebrow() {
     });
   }
 
-  function highlightItem(items) {
-    items.forEach((it, i) => it.classList.toggle('active', i === activeIdx));
+  function selectItem(inp, list, label) {
+    inp.value = label;
+    list.classList.remove('show');
+    if (inp.id === 'curloc') { gpsCoords = null; saveSettings(); }
+    if (inp.id === 'origin') document.getElementById('dest').focus();
+    else if (inp.id === 'dest') document.getElementById('rate').focus();
   }
 
-  async function fetchSuggestions(query, list, inp) {
+  function highlightItems(items, idx) {
+    items.forEach((it, i) => it.classList.toggle('active', i === idx));
+  }
+
+  async function fetchSuggestions(query, list, inp, resetIdx) {
     try {
-      const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query + ', USA') + '&format=json&limit=5&addressdetails=1', { headers: {'Accept-Language':'en'} });
+      const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query + ', USA') + '&format=json&limit=5&addressdetails=1', { headers: {'Accept-Language':'en','User-Agent':'LoadCalc/1.0'} });
       const results = await r.json();
       if (!results.length) { list.classList.remove('show'); return; }
 
       const seen = new Set();
       list.innerHTML = '';
-      activeIdx = -1;
+      resetIdx();
       results.forEach(function(r) {
         const a = r.address || {};
         const city = a.city || a.town || a.village || a.hamlet || a.municipality || '';
@@ -1570,11 +1614,7 @@ function updateEyebrow() {
         div.textContent = label;
         div.addEventListener('mousedown', function(e) {
           e.preventDefault();
-          inp.value = label;
-          list.classList.remove('show');
-          // Auto-focus next field
-          if (inp.id === 'origin') document.getElementById('dest').focus();
-          else if (inp.id === 'dest') document.getElementById('rate').focus();
+          selectItem(inp, list, label);
         });
         list.appendChild(div);
       });
@@ -1585,6 +1625,7 @@ function updateEyebrow() {
 
   setupAC('origin', 'ac-origin');
   setupAC('dest', 'ac-dest');
+  setupAC('curloc', 'ac-curloc');
 })();
 
 // ── Timezone detection from longitude ──
@@ -1779,7 +1820,7 @@ function detectLocation() {
         // If only township/municipality (ambiguous), add county for clarity
         const place = city || a.municipality || a.county || '';
         const state = a.state || '';
-        const loc = place + (place && state ? ', ' : '') + state;
+        const loc = capCity(place + (place && state ? ' ' : '') + state);
         if (loc) {
           document.getElementById('curloc').value = loc;
           saveSettings();
@@ -1909,7 +1950,7 @@ async function submitSuccessEmail() {
     // Verify the email is actually registered server-side before granting Pro
     const r = await fetch(API_PROXY + '?action=pro_check&email=' + encodeURIComponent(email));
     const d = await r.json();
-    if (d.pro) {
+    if (d.isPro) {
       localStorage.setItem('lc_pro', '1');
       localStorage.setItem('lc_pro_email', email);
       isPro = true;
