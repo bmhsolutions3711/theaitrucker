@@ -1671,9 +1671,10 @@ function setStatus(msg) {
   const el = document.getElementById('statusMsg');
   if (_roadInterval) { clearInterval(_roadInterval); _roadInterval = null; }
   if (!msg) { el.innerHTML = ''; el.classList.remove('active'); return; }
-  el.innerHTML = '<span class="truck-spin">🚛</span> ' + msg;
+  const isCalc = msg.includes('alculating') || msg.includes('route') || msg.includes('deadhead') || msg.includes('Looking');
+  el.innerHTML = (isCalc ? '<span class="truck-spin">🚛</span> ' : '') + msg;
   el.classList.add('active');
-  if (msg.includes('alculating') || msg.includes('route') || msg.includes('deadhead') || msg.includes('Looking')) {
+  if (isCalc) {
     let i = 0;
     _roadInterval = setInterval(() => {
       el.innerHTML = '<span class="truck-spin">🚛</span> ' + ROAD_MSGS[i % ROAD_MSGS.length];
