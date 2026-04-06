@@ -1180,7 +1180,23 @@ function cacheGet(key, ttl) {
   } catch(e) { return null; }
 }
 function cacheSet(key, val) {
-  try { localStorage.setItem('lc_cache_' + key, JSON.stringify({ val, ts: Date.now(), v: CACHE_VER })); } catch(e) {}
+  try {
+    localStorage.setItem('lc_cache_' + key, JSON.stringify({ val, ts: Date.now(), v: CACHE_VER }));
+  } catch(e) {
+    // Storage full — purge oldest cache entries and retry
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('lc_cache_')) {
+        try { const p = JSON.parse(localStorage.getItem(k)); keys.push({k, ts: p.ts || 0}); } catch(x) { keys.push({k, ts: 0}); }
+      }
+    }
+    keys.sort((a, b) => a.ts - b.ts);
+    // Remove oldest 20% of cache
+    const removeCount = Math.max(5, Math.floor(keys.length * 0.2));
+    for (let i = 0; i < removeCount && i < keys.length; i++) localStorage.removeItem(keys[i].k);
+    try { localStorage.setItem('lc_cache_' + key, JSON.stringify({ val, ts: Date.now(), v: CACHE_VER })); } catch(x) {}
+  }
 }
 
 // ── Local US Cities Database (48K cities, instant geocode) ──
