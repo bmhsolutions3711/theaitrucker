@@ -1265,11 +1265,42 @@ async function geocode(city) {
   } catch(e) { return null; }
 }
 
+// Convert Google overview_path (LatLng[]) to GeoJSON LineString for Leaflet
+function pathToGeoJSON(path) {
+  if (!path || !path.length) return null;
+  return {
+    type: 'LineString',
+    coordinates: path.map(p => [p.lng(), p.lat()])
+  };
+}
+
 async function routeMiles(fc, tc) {
   const key = 'route_' + fc.lat + '_' + fc.lon + '_' + tc.lat + '_' + tc.lon;
   const cached = cacheGet(key);
-  // Only use cached if it's the new object format (not old plain number)
   if (cached && typeof cached === 'object' && cached.miles) return cached;
+
+  // Use Google Directions API via Maps JS SDK (no CORS issues)
+  if (typeof google !== 'undefined' && google.maps) {
+    try {
+      const svc = new google.maps.DirectionsService();
+      const resp = await svc.route({
+        origin: new google.maps.LatLng(parseFloat(fc.lat), parseFloat(fc.lon)),
+        destination: new google.maps.LatLng(parseFloat(tc.lat), parseFloat(tc.lon)),
+        travelMode: google.maps.TravelMode.DRIVING
+      });
+      const leg = resp.routes?.[0]?.legs?.[0];
+      if (!leg) return null;
+      const miles = Math.round(leg.distance.value * 0.000621371);
+      const geometry = pathToGeoJSON(resp.routes[0].overview_path);
+      const result = { miles, geometry };
+      cacheSet(key, result);
+      return result;
+    } catch(e) {
+      console.warn('Google Directions failed, falling back to OSRM:', e.message);
+    }
+  }
+
+  // Fallback: OSRM (free, slower)
   try {
     const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + fc.lon+','+fc.lat+';'+tc.lon+','+tc.lat+'?overview=full&geometries=geojson');
     if (r.status === 429 || r.status === 503) { setStatus('⚠️ Route service busy — try again in a moment'); return null; }
@@ -2165,6 +2196,7 @@ document.getElementById('rate').addEventListener('keydown', function(e) {
   }
 });
 </script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBzhiZluHFwhBjh7GRRZitmEB1D0JShUiE" async defer></script>
 <script src="analytics.js"></script>
 </body>
 </html>
