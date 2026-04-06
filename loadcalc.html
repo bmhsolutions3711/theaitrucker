@@ -1183,22 +1183,78 @@ function cacheSet(key, val) {
   try { localStorage.setItem('lc_cache_' + key, JSON.stringify({ val, ts: Date.now(), v: CACHE_VER })); } catch(e) {}
 }
 
+// ── Local US Cities Database (48K cities, instant geocode) ──
+let _localGeo = null;
+let _localGeoLoading = false;
+async function loadLocalGeo() {
+  if (_localGeo) return _localGeo;
+  if (_localGeoLoading) { // wait for in-flight load
+    while (_localGeoLoading) await new Promise(r => setTimeout(r, 50));
+    return _localGeo;
+  }
+  _localGeoLoading = true;
+  try {
+    // Check localStorage first (cached copy)
+    const cached = localStorage.getItem('lc_geo_db');
+    if (cached) {
+      _localGeo = JSON.parse(cached);
+      _localGeoLoading = false;
+      return _localGeo;
+    }
+    // Fetch from server
+    const r = await fetch('us_cities_geo.json');
+    if (r.ok) {
+      _localGeo = await r.json();
+      try { localStorage.setItem('lc_geo_db', JSON.stringify(_localGeo)); } catch(e) {} // cache it
+    }
+  } catch(e) { /* fall through to Nominatim */ }
+  _localGeoLoading = false;
+  return _localGeo;
+}
+
+function localGeoLookup(city) {
+  if (!_localGeo) return null;
+  // Parse "City, ST" or "City, State Name" or just "City"
+  const raw = city.trim().toLowerCase();
+  // Try exact match: "city,st"
+  const parts = raw.split(',').map(s => s.trim());
+  if (parts.length >= 2) {
+    // "springfield, mo" → "springfield,mo"
+    const key = parts[0] + ',' + parts[1];
+    if (_localGeo[key]) return { lat: _localGeo[key][0], lon: _localGeo[key][1] };
+    // Try with full state name match — user might type "springfield, missouri"
+    // The DB has both "city,ST" and "city" keys, state names not stored separately
+  }
+  // Try city-only fallback
+  if (_localGeo[parts[0]]) return { lat: _localGeo[parts[0]][0], lon: _localGeo[parts[0]][1] };
+  return null;
+}
+
+// Preload on page load
+loadLocalGeo();
+
 async function geocode(city) {
   const key = 'geo_' + city.toLowerCase().replace(/\s+/g,'_');
   const cached = cacheGet(key);
   if (cached) return cached;
+
+  // Try local database first (instant, no API call)
+  await loadLocalGeo();
+  const local = localGeoLookup(city);
+  if (local) {
+    cacheSet(key, local);
+    return local;
+  }
+
+  // Fall back to Nominatim for cities not in local DB
   try {
     const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(city + ', USA') + '&format=json&limit=5&addressdetails=1', {headers:{'Accept-Language':'en','User-Agent':'LoadCalc/1.0'}});
     if (r.status === 429) { setStatus('⚠️ Too many requests — try again in a moment'); return null; }
     const d = await r.json();
     if (!d.length) return null;
-    // Prefer cities/towns/villages over counties and large admin areas
-    // A result IS a county if its display_name starts with the county name (e.g. "Jefferson County, Ohio")
-    // A result IN a county is fine (e.g. "Jefferson, Ashtabula County, Ohio")
     const cityName = city.split(',')[0].trim().toLowerCase();
     const isCountyResult = r => {
       const dn = (r.display_name || '').toLowerCase();
-      // It's a county-level result if "county" appears right after the city name
       return dn.startsWith(cityName + ' county') || (r.class === 'boundary' && r.type === 'administrative' && !r.address?.city && !r.address?.town && !r.address?.village);
     };
     const places = d.filter(r => !isCountyResult(r));
