@@ -1165,7 +1165,7 @@ function capCity(s) {
 }
 
 // ── Geocode + Route (with localStorage cache) ──
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days — cities don't move
 const CACHE_VER = 3; // Bump this when geocode/route logic changes to invalidate stale entries
 
 function cacheGet(key, ttl) {
@@ -1254,29 +1254,29 @@ async function calculate() {
     if (!fc) { setStatus('Could not find: ' + origin); return; }
     if (!tc) { setStatus('Could not find: ' + dest);   return; }
     setStatus('Calculating…');
-    const routeData = await routeMiles(fc, tc);
-    if (!routeData) { setStatus('Could not calculate route'); return; }
-    const miles = routeData.miles;
-    const routeGeometry = routeData.geometry;
 
-    // Deadhead + return if current location is set (parallel)
+    // Parallelize: main route + deadhead geocode + return geocode all at once
     let deadheadMiles = 0, returnMiles = 0;
     let dhGeometry = null, retGeometry = null;
     const getHome = document.getElementById('gethome').checked;
     let cc = null;
-    if (curloc) {
-      setStatus('Calculating deadhead…');
-      cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
-      if (cc) {
-        const [dhData, retData] = await Promise.all([
-          routeMiles(cc, fc),
-          getHome ? routeMiles(tc, cc) : Promise.resolve(null)
-        ]);
-        deadheadMiles = dhData ? dhData.miles : 0;
-        dhGeometry = dhData ? dhData.geometry : null;
-        returnMiles = retData ? retData.miles : 0;
-        retGeometry = retData ? retData.geometry : null;
-      }
+    const ccPromise = curloc ? (gpsCoords ? Promise.resolve({lat: gpsCoords[0], lon: gpsCoords[1]}) : geocode(curloc)) : Promise.resolve(null);
+    const [routeData, ccResult] = await Promise.all([routeMiles(fc, tc), ccPromise]);
+    cc = ccResult;
+    if (!routeData) { setStatus('Could not calculate route'); return; }
+    const miles = routeData.miles;
+    const routeGeometry = routeData.geometry;
+
+    // Deadhead + return routes (parallel)
+    if (cc) {
+      const [dhData, retData] = await Promise.all([
+        routeMiles(cc, fc),
+        getHome ? routeMiles(tc, cc) : Promise.resolve(null)
+      ]);
+      deadheadMiles = dhData ? dhData.miles : 0;
+      dhGeometry = dhData ? dhData.geometry : null;
+      returnMiles = retData ? retData.miles : 0;
+      retGeometry = retData ? retData.geometry : null;
     }
 
     // Server already incremented count in calc_gate — just mirror locally
@@ -1320,11 +1320,14 @@ async function calculateMulti() {
       if (!geoResults[i]) { setStatus('Could not find: ' + allCities[i]); return; }
     }
 
-    // Route all legs in parallel
+    // Route all legs + deadhead geocode in parallel
     setStatus('Calculating routes…');
-    const routeResults = await Promise.all(
-      valid.map((s, i) => routeMiles(geoResults[i * 2], geoResults[i * 2 + 1]))
-    );
+    const getHome = document.getElementById('gethome').checked;
+    const ccPromise = curloc ? (gpsCoords ? Promise.resolve({lat: gpsCoords[0], lon: gpsCoords[1]}) : geocode(curloc)) : Promise.resolve(null);
+    const [ccResult, ...routeResults] = await Promise.all([
+      ccPromise,
+      ...valid.map((s, i) => routeMiles(geoResults[i * 2], geoResults[i * 2 + 1]))
+    ]);
 
     let totalMiles = 0, totalRate = 0;
     const legs = [];
@@ -1340,23 +1343,19 @@ async function calculateMulti() {
     const firstPickupCoords = geoResults[0];
     const lastDropCoords = geoResults[geoResults.length - 1];
 
-    // Deadhead + return if current location is set (parallel)
+    // Deadhead + return routes (parallel)
     let deadheadMiles = 0, returnMiles = 0;
     let dhGeometry = null, retGeometry = null;
-    const getHome = document.getElementById('gethome').checked;
-    let cc = null;
-    if (curloc) {
-      setStatus('Calculating deadhead…');
-      cc = gpsCoords ? {lat: gpsCoords[0], lon: gpsCoords[1]} : await geocode(curloc);
-      if (cc) {
-        const [dhData, retData] = await Promise.all([
-          routeMiles(cc, firstPickupCoords),
-          getHome ? routeMiles(lastDropCoords, cc) : Promise.resolve(null)
-        ]);
-        deadheadMiles = dhData ? dhData.miles : 0;
-        dhGeometry = dhData ? dhData.geometry : null;
-        returnMiles = retData ? retData.miles : 0;
-        retGeometry = retData ? retData.geometry : null;
+    let cc = ccResult;
+    if (cc) {
+      const [dhData, retData] = await Promise.all([
+        routeMiles(cc, firstPickupCoords),
+        getHome ? routeMiles(lastDropCoords, cc) : Promise.resolve(null)
+      ]);
+      deadheadMiles = dhData ? dhData.miles : 0;
+      dhGeometry = dhData ? dhData.geometry : null;
+      returnMiles = retData ? retData.miles : 0;
+      retGeometry = retData ? retData.geometry : null;
       }
     }
 
