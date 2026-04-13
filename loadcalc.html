@@ -894,8 +894,8 @@ async function verifyProStatus() {
     }
     proVerified = true;
   } catch(e) {
-    // Network error — trust cached local state for this session only
-    isPro = localStorage.getItem('lc_pro') === '1';
+    console.warn('Pro verification failed:', e);
+    isPro = false;
     proVerified = false;
   }
   updateTrialBar(); updateEyebrow(); updateRestoreLink();
@@ -911,8 +911,8 @@ async function fetchCalcGate() {
     updateTrialBar();
     return { allowed: d.allowed !== false };
   } catch(e) {
-    // Network error — fall back to local count
-    return { allowed: isPro || calcCount < FREE_LIMIT };
+    console.warn('Calc gate check failed:', e);
+    return { allowed: false, error: 'offline' };
   }
 }
 
@@ -1349,11 +1349,14 @@ async function calculate() {
   try {
     // Run server auth check in parallel with geocoding — zero added latency
     const [authResult, fc, tc] = await Promise.all([
-      isPro ? Promise.resolve({allowed:true}) : fetchCalcGate(),
+      (isPro && proVerified) ? Promise.resolve({allowed:true}) : fetchCalcGate(),
       geocode(origin),
       geocode(dest)
     ]);
-    if (!authResult.allowed) { showPaywall(); return; }
+    if (!authResult.allowed) {
+      if (authResult.error === 'offline') { setStatus('Calculation requires internet connection for verification.'); return; }
+      showPaywall(); return;
+    }
     if (!fc) { setStatus('Could not find: ' + origin); return; }
     if (!tc) { setStatus('Could not find: ' + dest);   return; }
     setStatus('Calculating…');
@@ -1415,10 +1418,13 @@ async function calculateMulti() {
     setStatus('Looking up locations…');
     const allCities = valid.flatMap(s => [s.origin, s.dest]);
     const [authResult, ...geoResults] = await Promise.all([
-      isPro ? Promise.resolve({allowed:true}) : fetchCalcGate(),
+      (isPro && proVerified) ? Promise.resolve({allowed:true}) : fetchCalcGate(),
       ...allCities.map(c => geocode(c))
     ]);
-    if (!authResult.allowed) { showPaywall(); return; }
+    if (!authResult.allowed) {
+      if (authResult.error === 'offline') { setStatus('Calculation requires internet connection for verification.'); return; }
+      showPaywall(); return;
+    }
     for (let i = 0; i < geoResults.length; i++) {
       if (!geoResults[i]) { setStatus('Could not find: ' + allCities[i]); return; }
     }

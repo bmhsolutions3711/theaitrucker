@@ -646,16 +646,6 @@
       : 'https://buy.stripe.com/fZu5kD1ulazx7cs6DLgQE00';
   }
 
-  // Payment success check
-  (function() {
-    const p = new URLSearchParams(window.location.search);
-    if (p.get('success') === '1') {
-      localStorage.setItem('lc_pro','1'); isPro = true;
-      updateTrialBar(); closePaywall();
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  })();
-
   // Restore last from/to/rate values
   (function() {
     const lo = localStorage.getItem('lc_last_origin');
