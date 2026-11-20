@@ -349,15 +349,15 @@ html:not(.js) .glass-ctl{display:none}
 @keyframes rock{0%,86%{transform:none}93%{transform:rotate(-6deg)}100%{transform:none}}
 @keyframes puff{0%{opacity:0;transform:scale(.5)}30%{opacity:.9}100%{opacity:0;transform:translateX(-24px) scale(1.8)}}
 @media (min-width:860px){
-.lg{display:grid;grid-template-columns:var(--lw) minmax(0,1fr) var(--nw);grid-template-rows:2.4rem calc(var(--rh) * 3);padding-bottom:8px}
+.lg{display:grid;grid-template-columns:var(--lw) minmax(0,1fr) var(--nw);grid-template-rows:2.4rem calc(var(--rh) * 2);padding-bottom:8px}
 .lg-mo{grid-area:1/2;display:grid;grid-template-columns:repeat(9,1fr);align-items:end;padding-bottom:9px}
 .lg-mo span,.lg-nh,.lg-ln span{font:500 .8125rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--chrome)}
 .lg-mo span{text-align:center}
 .lg-nh{grid-area:1/3;align-self:end;padding:0 0 9px 24px;color:var(--yellow)}
-.lg-ln{grid-area:2/1;display:grid;grid-template-rows:repeat(3,1fr)}
+.lg-ln{grid-area:2/1;display:grid;grid-template-rows:repeat(2,1fr)}
 .lg-ln span{display:flex;align-items:center;padding-left:20px;letter-spacing:.12em}
 .lg-plot{grid-area:2/2;position:relative;border-top:1px solid rgba(192,200,208,.22);border-bottom:1px solid rgba(192,200,208,.22);
-background:linear-gradient(90deg,rgba(192,200,208,.3) 1px,transparent 1px) 0 0/calc(100% / 9) 100%,linear-gradient(rgba(192,200,208,.13) 1px,transparent 1px) 0 0/100% calc(100% / 3),linear-gradient(90deg,transparent calc(50% - .5px),rgba(192,200,208,.1) calc(50% - .5px),rgba(192,200,208,.1) calc(50% + .5px),transparent calc(50% + .5px)) 0 0/calc(100% / 9) 100%}
+background:linear-gradient(90deg,rgba(192,200,208,.3) 1px,transparent 1px) 0 0/calc(100% / 9) 100%,linear-gradient(rgba(192,200,208,.13) 1px,transparent 1px) 0 0/100% calc(100% / 2),linear-gradient(90deg,transparent calc(50% - .5px),rgba(192,200,208,.1) calc(50% - .5px),rgba(192,200,208,.1) calc(50% + .5px),transparent calc(50% + .5px)) 0 0/calc(100% / 9) 100%}
 .lg-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 5px rgba(255,214,0,.4))}
 .lg-svg .lp line{stroke:var(--yellow);stroke-width:3;stroke-linecap:square}
 .lg-svg .lx{stroke:var(--yellow);stroke-width:2;stroke-dasharray:5 5}
@@ -365,7 +365,7 @@ background:linear-gradient(90deg,rgba(192,200,208,.3) 1px,transparent 1px) 0 0/c
 .lg-brk{position:absolute;top:6px;left:7.89%;width:5.44%;height:7px;border:1px solid rgba(192,200,208,.6);border-bottom:0}
 .lg-brk span{position:absolute;left:calc(100% + 8px);top:-4px;font:500 .8125rem/1 var(--mono);letter-spacing:.1em;color:var(--chrome);white-space:nowrap;text-transform:uppercase}
 .lg-next{grid-area:2/3;position:relative;background:rgba(255,214,0,.03);border-top:1px solid rgba(192,200,208,.22);border-bottom:1px solid rgba(192,200,208,.22)}
-.lg-next::before{content:"";position:absolute;left:0;top:50%;width:33px;height:33.333%;border-right:2px dashed var(--yellow);border-bottom:2px dashed var(--yellow)}
+.lg-next::before{content:"";position:absolute;left:0;top:50%;width:33px;height:25%;border-right:2px dashed var(--yellow);border-bottom:2px dashed var(--yellow)}
 .nx-ring{position:absolute;left:22px;top:50%;width:24px;height:24px;margin-top:-12px;border-radius:50%;background:var(--panel);border:2px dashed var(--yellow)}
 .nx-ring::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--yellow);opacity:0}
 .nx-l{position:absolute;left:58px;right:10px;top:50%;transform:translateY(-50%);font:800 1.1875rem/1.05 var(--display);text-transform:uppercase}
@@ -397,7 +397,7 @@ background:linear-gradient(90deg,rgba(192,200,208,.3) 1px,transparent 1px) 0 0/c
 .lnext .lc-no{background:transparent;color:var(--yellow);outline:1px dashed var(--yellow)}
 .e-next{display:inline-block;margin-top:4px;font:900 clamp(30px,2.6vw,2.6rem)/1 var(--display);text-transform:uppercase;color:var(--yellow);text-decoration:none}
 .e-next:hover{text-decoration:underline;text-underline-offset:5px}
-@media (min-width:860px){.lcards{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}}
+@media (min-width:860px){.lcards{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.lnext{grid-column:span 2}}
 @media (max-width:859px){
 .lcards{padding-left:26px}
 .lcard{box-shadow:none;border-left:1px solid var(--border);border-radius:0 6px 6px 0;padding-left:20px}
@@ -534,8 +534,8 @@ html:not(.js) :is(.chip-lbl,.chips,.picks,.copy){display:none}
 <p class="hud-head" aria-hidden="true"><i></i>What my systems call out</p>
 <ol aria-label="What my systems call out">
 <li><a class="hud-row" href="#log-02"><span class="ev">Order in</span><span class="out">Job file, folder and invoice built.</span><span class="go">Log 02 &darr;</span><i class="tick" aria-hidden="true"></i></a></li>
-<li><a class="hud-row" href="#log-05"><span class="ev">Broker email in spam <span class="when">Oct 2026</span></span><span class="out">Read it anyway. Put it on my phone.</span><span class="go">Log 05 &darr;</span><i class="tick" aria-hidden="true"></i></a></li>
-<li><a class="hud-row" href="#log-04"><span class="ev">Flash flood emergency <span class="when">Oct 2026</span></span><span class="out">Rang my phone.</span><span class="go">Log 04 &darr;</span><i class="tick" aria-hidden="true"></i></a></li>
+<li><a class="hud-row" href="#log-04"><span class="ev">Broker email in spam <span class="when">Oct 2026</span></span><span class="out">Read it anyway. Put it on my phone.</span><span class="go">Log 04 &darr;</span><i class="tick" aria-hidden="true"></i></a></li>
+<li><a class="hud-row" href="#log-03"><span class="ev">Flash flood emergency <span class="when">Oct 2026</span></span><span class="out">Rang my phone.</span><span class="go">Log 03 &darr;</span><i class="tick" aria-hidden="true"></i></a></li>
 <li><a class="hud-row" href="#build"><span class="ev">Bill coming due</span><span class="out">On the month's road map.</span><span class="go">Stop 1 &darr;</span><i class="tick" aria-hidden="true"></i></a></li>
 </ol>
 <a class="hud-more" href="#work">See the log &darr;</a>
@@ -584,7 +584,7 @@ html:not(.js) :is(.chip-lbl,.chips,.picks,.copy){display:none}
 <h3>An inbox that never misses money</h3>
 <p>It reads the mail and rings your phone when a customer pays, and flags an important email that lands in spam.</p>
 <p class="proof"><b>On my rig:</b> the mail desk. What it caught is on the log.</p>
-<a class="olink" href="#log-05">Log 05 &darr;</a>
+<a class="olink" href="#log-04">Log 04 &darr;</a>
 </div>
 </article>
 <article class="offer">
@@ -617,8 +617,7 @@ html:not(.js) :is(.chip-lbl,.chips,.picks,.copy){display:none}
 <div>
 <h3>Field tools for the phone</h3>
 <ul class="kit"><li>Scan paperwork at the job.</li><li>Catch receipts on the jobsite.</li><li>Talk instead of type.</li></ul>
-<p class="proof"><b>First client build:</b> a jobsite receipts app for a contractor friend, no server behind it.</p>
-<a class="olink" href="#log-03">Log 03 &darr;</a>
+<p class="proof"><b>On my rig:</b> I scan the signed paperwork on my phone at the dock, and it lands in that load's folder.</p>
 </div>
 </article>
 </div>
@@ -634,7 +633,7 @@ html:not(.js) :is(.chip-lbl,.chips,.picks,.copy){display:none}
 <div>
 <p class="eyebrow"><span class="sr">STOP 2 · </span>The work</p>
 <h2 class="h2" id="work-h">Receipts, <span class="y">not promises.</span></h2>
-<p class="kick">Real builds, real dates. No client names.</p>
+<p class="kick">Real builds, real dates.</p>
 </div>
 </header>
 <div class="log" id="log">
@@ -645,10 +644,10 @@ html:not(.js) :is(.chip-lbl,.chips,.picks,.copy){display:none}
 <div class="lg" role="img" aria-label="Log grid, March to November 2026. The entries are listed below.">
 <div class="lg-mo"><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span></div>
 <div class="lg-nh">Next</div>
-<div class="lg-ln"><span>Built</span><span>Client</span><span>Live</span></div>
+<div class="lg-ln"><span>Built</span><span>Live</span></div>
 <div class="lg-plot">
 <span class="lg-brk"><span>16 days</span></span>
-<svg class="lg-svg" focusable="false"><g class="lp"><line x1="7.89%" y1="16.667%" x2="11.85%" y2="16.667%"/><line x1="11.85%" y1="16.667%" x2="11.85%" y2="50%"/><line x1="11.85%" y1="50%" x2="13.33%" y2="50%"/><line x1="77.78%" y1="83.333%" x2="89.26%" y2="83.333%"/></g><line class="lx" x1="89.26%" y1="83.333%" x2="100%" y2="83.333%"/><g><circle cx="7.89%" cy="16.667%" r="6"/><circle cx="10.39%" cy="16.667%" r="6"/><circle cx="11.85%" cy="50%" r="6"/><circle cx="77.78%" cy="83.333%" r="6"/></g></svg>
+<svg class="lg-svg" focusable="false"><g class="lp"><line x1="7.89%" y1="25%" x2="13.33%" y2="25%"/><line x1="77.78%" y1="75%" x2="89.26%" y2="75%"/></g><line class="lx" x1="89.26%" y1="75%" x2="100%" y2="75%"/><g><circle cx="7.89%" cy="25%" r="6"/><circle cx="10.39%" cy="25%" r="6"/><circle cx="77.78%" cy="75%" r="6"/></g></svg>
 </div>
 <div class="lg-next"><i class="nx-ring"></i><span class="nx-l">Your business <em>— let's talk</em></span></div>
 </div>
@@ -666,7 +665,7 @@ html:not(.js) :is(.chip-lbl,.chips,.picks,.copy){display:none}
 <li class="lcard" id="log-01">
 <p class="lc-meta"><span class="lc-no">01</span><time datetime="2026-03-23">Mar 23 – Apr 7, 2026</time><span class="lane">Built</span></p>
 <p class="lc-fig">16<small>days</small></p>
-<p class="lc-body">A cockpit for the whole business, a voice companion, a crew of local AI models, a finance center and two client builds.</p>
+<p class="lc-body">A cockpit for the whole business, a voice companion, a crew of local AI models and a finance center.</p>
 </li>
 <li class="lcard" id="log-02">
 <p class="lc-meta"><span class="lc-no">02</span><time datetime="2026-03-30">Mar 30, 2026</time><span class="lane">Built</span></p>
@@ -675,25 +674,19 @@ html:not(.js) :is(.chip-lbl,.chips,.picks,.copy){display:none}
 <p class="lc-body">Thirty to sixty minutes. That's what my build notes say the paperwork on one load used to take. On March 30, 2026, they put it at two to three.</p>
 </li>
 <li class="lcard" id="log-03">
-<p class="lc-meta"><span class="lc-no">03</span><time datetime="2026-04-03">2026</time><span class="lane">Client</span></p>
-<p class="lc-fig">Apr 3</p>
-<p class="lc-sub">First client build</p>
-<p class="lc-body">A jobsite receipts app for a contractor friend, no server behind it. By the next day two contractors were using it.</p>
-</li>
-<li class="lcard" id="log-04">
-<p class="lc-meta"><span class="lc-no">04</span><time datetime="2026-10-31">Oct 31, 2026</time><span class="lane">Live</span></p>
+<p class="lc-meta"><span class="lc-no">03</span><time datetime="2026-10-31">Oct 31, 2026</time><span class="lane">Live</span></p>
 <p class="lc-fig">Storm</p>
 <p class="lc-sub">The storm alarm</p>
 <p class="lc-body">It checks every National Weather Service alert against my upcoming stops, and rings when a major storm sits on my lane.</p>
 </li>
-<li class="lcard" id="log-05">
-<p class="lc-meta"><span class="lc-no">05</span><time datetime="2026-10-20">Oct 20, 2026</time><span class="lane">Live</span></p>
+<li class="lcard" id="log-04">
+<p class="lc-meta"><span class="lc-no">04</span><time datetime="2026-10-20">Oct 20, 2026</time><span class="lane">Live</span></p>
 <p class="lc-fig">Spam</p>
 <p class="lc-sub">The mail desk</p>
 <p class="lc-body">Gmail put a broker's accounting email in Spam. My mail desk read it anyway and put it on my phone.</p>
 </li>
-<li class="lcard lnext" id="log-06">
-<p class="lc-meta"><span class="lc-no">06</span><span>Next</span><span class="cf">[YOUR BUSINESS]</span></p>
+<li class="lcard lnext" id="log-05">
+<p class="lc-meta"><span class="lc-no">05</span><span>Next</span><span class="cf">[YOUR BUSINESS]</span></p>
 <a class="e-next" href="#contact">Your business — let's talk →</a>
 </li>
 </ol>
